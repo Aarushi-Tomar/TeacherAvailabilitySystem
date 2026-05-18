@@ -1,5 +1,5 @@
 let isLogin = false;
-
+const BASE_URL = window.location.origin;
 function toggleAuth() {
     isLogin = !isLogin;
     
@@ -64,7 +64,7 @@ authForm.addEventListener('submit', async (e) => {
     }
 
     try {
-        const response = await fetch(`http://localhost:5000/api/auth/${type}`, {
+        const response = await fetch(`${BASE_URL}/api/auth/${type}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(authData) // Send the correct data[cite: 12]

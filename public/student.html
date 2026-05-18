@@ -34,7 +34,7 @@
 
 async function fetchTeachers() {
     try {
-        const res = await fetch('http://localhost:5000/api/student/teachers');
+        const res = await fetch(`${BASE_URL}/api/student/teachers`);
         allTeachers = await res.json();
         renderTeachers(allTeachers);
     } catch (err) {

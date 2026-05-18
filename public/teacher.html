@@ -55,7 +55,7 @@
             const cabin = document.getElementById('tempCabin').value;
             
             try {
-                const res = await fetch('http://localhost:5000/api/teacher/update-status', {
+                const res = await fetch(`${BASE_URL}/api/teacher/update-status`, {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
