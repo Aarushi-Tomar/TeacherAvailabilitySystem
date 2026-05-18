@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Teacher Dashboard | TAS</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="display: block; height: auto;">
+    <main class="main-container">
+        <section class="left-side">
+            <div class="branding-content">
+                <div class="logo-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+                <h1>Professor Portal</h1>
+                <p>Manage your availability and help students find the right time to connect with you.</p>
+            </div>
+        </section>
+
+        <section class="right-side">
+            <div class="auth-card">
+                <div class="form-header">
+                    <h2>Manual Status Override</h2>
+                    <p>This will bypass your weekly timetable</p>
+                </div>
+
+                <div class="input-field">
+                    <i class="fas fa-eye"></i>
+                    <select id="manualStatus">
+                        <option value="None">Follow Timetable</option>
+                        <option value="Available">Available in Cabin</option>
+                        <option value="In Meeting">In Meeting</option>
+                        <option value="Off Campus">Off Campus</option>
+                        <option value="On Leave">On Leave</option>
+                    </select>
+                </div>
+
+                <div class="input-field">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <input type="text" id="tempCabin" placeholder="Update Cabin (e.g. C-Block 102)">
+                </div>
+
+                <button onclick="updateTeacherStatus()" class="btn-gradient">
+                    <span>Update Status</span>
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+
+                <p class="toggle-link"><a href="#" onclick="logout()">Logout System</a></p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        async function updateTeacherStatus() {
+            const status = document.getElementById('manualStatus').value;
+            const cabin = document.getElementById('tempCabin').value;
+            
+            try {
+                const res = await fetch('http://localhost:5000/api/teacher/update-status', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ manualStatus: status, cabin: cabin })
+                });
+                if(res.ok) alert("Status updated successfully!");
+            } catch (err) {
+                alert("Server error. Ensure backend is running.");
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
