@@ -1,47 +1,42 @@
 const mongoose = require('mongoose');
 
-const userSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    email: { 
-        type: String, 
-        required: true, 
-        unique: true,
-        // This ensures emails follow the university format
-        match: [/@(student|teacher)\.edu$/, 'Please use a valid university email']
-    },
-    password: { type: String, required: true, minlength: 6 },
-    role: { type: String, enum: ['student', 'teacher'], required: true }
-}, { timestamps: true });
-
-module.exports = mongoose.model('User', userSchema);
-
-
-const timetableSchema = new mongoose.Schema({
-    day: { type: String, enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
-    slots: [{
-        startTime: String, // e.g., "09:00"
-        endTime: String,   // e.g., "10:00"
-        activityType: { type: String, enum: ['Class', 'Cabin', 'Lab', 'Meeting'], default: 'Cabin' },
-        subject: String,
-        room: String
-    }]
+const TimetableSlotSchema = new mongoose.Schema({
+    slotNumber: { type: Number, required: true }, // 1 to 10
+    startTime: { type: String, required: true },  // e.g., "08:30"
+    endTime: { type: String, required: true },    // e.g., "09:20"
+    status: { type: String, default: 'Available', enum: ['Available', 'In Class', 'Busy', 'Off Campus'] },
+    location: { type: String, default: 'Cabin' }  // Dynamic room/lab/cabin
 });
 
-// const userSchema = new mongoose.Schema({
-//     name: { type: String, required: true },
-//     email: { type: String, required: true, unique: true },
-//     password: { type: String, required: true },
-//     role: { type: String, enum: ['student', 'teacher'], required: true },
-//     department: { type: String, default: 'General' },
-//     cabin: { type: String, default: 'Not Assigned' },
-//     // Advanced Availability Fields
-//     manualStatus: { 
-//         type: String, 
-//         enum: ['None', 'Available', 'Busy', 'In Meeting', 'Off Campus', 'On Leave'], 
-//         default: 'None' 
-//     },
-//     statusExpiry: { type: Date }, // For "Busy Until X Time"
-//     timetable: [timetableSchema]
-// });
+const UserSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    role: { type: String, enum: ['student', 'teacher'], required: true },
+    department: { type: String, default: 'CSE' },
+    
+    // The timetable grid array (Only populated for teachers)
+    timetable: [TimetableSlotSchema]
+}, { timestamps: true });
 
-// module.exports = mongoose.model('User', userSchema);
+// Pre-populate default 10 slots when a teacher is created
+UserSchema.pre('save', function(next) {
+    if (this.role === 'teacher' && this.timetable.length === 0) {
+        const defaultSlots = [
+            { slotNumber: 1, startTime: "08:30", endTime: "09:20" },
+            { slotNumber: 2, startTime: "09:25", endTime: "10:15" },
+            { slotNumber: 3, startTime: "10:20", endTime: "11:10" },
+            { slotNumber: 4, startTime: "11:15", endTime: "12:05" },
+            { slotNumber: 5, startTime: "12:10", endTime: "13:00" },
+            { slotNumber: 6, startTime: "13:00", endTime: "13:50" },
+            { slotNumber: 7, startTime: "13:55", endTime: "14:45" },
+            { slotNumber: 8, startTime: "14:50", endTime: "15:40" },
+            { slotNumber: 9, startTime: "13:45", endTime: "16:35" },
+            { slotNumber: 10, startTime: "16:40", endTime: "17:30" }
+        ];
+        this.timetable = defaultSlots;
+    }
+    next();
+});
+
+module.exports = mongoose.model('User', UserSchema);
