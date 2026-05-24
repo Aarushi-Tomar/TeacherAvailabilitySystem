@@ -3,16 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Availability System | Login</title>
-    <!-- Font Awesome for Icons -->
+    <title>Teacher Availability System | Login & Registration</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Forgot Password Modal Overlay Styles */
+        .modal-overlay {
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(15, 23, 42, 0.75); 
+            backdrop-filter: blur(4px);
+            z-index: 1000; 
+            justify-content: center; 
+            align-items: center; 
+            padding: 20px;
+        }
+        .modal-card {
+            width: 100%; 
+            max-width: 420px; 
+            background: #ffffff; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+        }
+        .modal-card h3 {
+            font-size: 1.4rem;
+            color: #1e293b;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        .modal-card p {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        .modal-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-cancel-btn {
+            background: transparent;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+        .modal-cancel-btn:hover {
+            background: #f8fafc;
+            color: #334155;
+        }
+        .forgot-link-container {
+            text-align: right; 
+            margin-top: -8px; 
+            margin-bottom: 15px;
+            display: none; /* Only visible on Login Mode */
+        }
+        .forgot-link-container a {
+            color: #6366f1; 
+            font-size: 0.85rem; 
+            font-weight: 600; 
+            text-decoration: none;
+        }
+        .forgot-link-container a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <main class="main-container">
-        <!-- Left Side: Branding -->
         <section class="left-side">
             <div class="branding-content">
                 <div class="logo-icon">
@@ -21,13 +91,11 @@
                 <h1>Teacher Availability System</h1>
                 <p>Manage teacher availability and book appointments easily. A smart digital solution for a modern campus.</p>
                 <div class="illustration">
-                    <!-- Simple CSS-based illustration or icon -->
-                    <i class="fas fa-calendar-check-pulse"></i>
+                    <i class="fas fa-calendar-check"></i>
                 </div>
             </div>
         </section>
 
-        <!-- Right Side: Form -->
         <section class="right-side">
             <div class="auth-card">
                 <div class="form-header">
@@ -35,7 +103,7 @@
                     <p id="auth-subtitle">Join our academic community today</p>
                 </div>
 
-                <form id="auth-form">
+                <form id="auth-form" onsubmit="handleSubmit(event)">
                     <div class="input-field" id="name-field">
                         <i class="fas fa-user"></i>
                         <input type="text" id="name" placeholder="Full Name">
@@ -43,16 +111,20 @@
 
                     <div class="input-field">
                         <i class="fas fa-envelope"></i>
-                        <input type="email" id="email" placeholder="name@university.edu" required>
+                        <input type="email" id="email" placeholder="name@student.edu" required>
                     </div>
 
                     <div class="input-field">
                         <i class="fas fa-lock"></i>
                         <input type="password" id="password" placeholder="Password" minlength="6" required>
-                        <i class="fas fa-eye toggle-password" id="eye-icon"></i>
+                        <i class="fas fa-eye toggle-password" id="eye-icon" onclick="handleTogglePasswordView()"></i>
                     </div>
 
-                    <div class="input-field">
+                    <div class="forgot-link-container" id="forgot-password-link-block">
+                        <a href="javascript:void(0)" onclick="openResetModal()">Forgot Password?</a>
+                    </div>
+
+                    <div class="input-field" id="role-field">
                         <i class="fas fa-user-tag"></i>
                         <select id="role">
                             <option value="" disabled selected>Select your role</option>
@@ -61,10 +133,10 @@
                         </select>
                     </div>
 
-                    <div id="error-message" class="error-text"></div>
+                    <div id="error-message" class="error-text" style="color: #ef4444; font-size: 0.85rem; margin-bottom: 15px; font-weight: 600;"></div>
 
                     <button type="submit" class="btn-gradient" id="auth-btn">
-                        <span>Sign Up</span>
+                        <span id="btn-text">Sign Up</span>
                         <i class="fas fa-arrow-right"></i>
                     </button>
                 </form>
@@ -76,6 +148,200 @@
             </div>
         </section>
     </main>
-    <script src="script.js"></script>
+
+    <div id="forgotPasswordModal" class="modal-overlay">
+        <div class="modal-card">
+            <h3>Reset Password</h3>
+            <p>Enter your registered institutional college email address below to configure a new account access password immediately.</p>
+            
+            <form id="forgotPasswordForm" onsubmit="handlePasswordReset(event)">
+                <div class="input-field" style="margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 8px; display: flex; align-items: center; padding: 10px 15px; background: #fff;">
+                    <i class="fas fa-envelope" style="color: #94a3b8; margin-right: 10px;"></i>
+                    <input type="email" id="resetEmail" placeholder="Enter your email account" required style="border: none; outline: none; width: 100%; font-size: 0.9rem;">
+                </div>
+                
+                <div class="input-field" style="margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 8px; display: flex; align-items: center; padding: 10px 15px; background: #fff;">
+                    <i class="fas fa-lock" style="color: #94a3b8; margin-right: 10px;"></i>
+                    <input type="password" id="resetNewPassword" placeholder="Enter new password (min 6 characters)" minlength="6" required style="border: none; outline: none; width: 100%; font-size: 0.9rem;">
+                </div>
+                
+                <div class="modal-btn-group">
+                    <button type="submit" class="btn-gradient" style="width: 100%; display: flex; justify-content: center; align-items: center; padding: 12px; border-radius: 8px; border: none; color: white; font-weight: 700; cursor: pointer;">
+                        <span>Update Password</span>
+                    </button>
+                    <button type="button" onclick="closeResetModal()" class="modal-cancel-btn">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let isLoginMode = false; // Tracks whether state layout is viewing Login or Signup
+
+        function toggleAuth() {
+            isLoginMode = !isLoginMode;
+            const authTitle = document.getElementById('auth-title');
+            const authSubtitle = document.getElementById('auth-subtitle');
+            const nameField = document.getElementById('name-field');
+            const roleField = document.getElementById('role-field');
+            const btnText = document.getElementById('btn-text');
+            const toggleDesc = document.getElementById('toggle-desc');
+            const toggleAction = document.getElementById('toggle-action');
+            const forgotLinkBlock = document.getElementById('forgot-password-link-block');
+            const errMsg = document.getElementById('error-message');
+            
+            errMsg.innerText = ""; // Flush previous error alerts
+
+            if (isLoginMode) {
+                authTitle.innerText = "Welcome Back";
+                authSubtitle.innerText = "Log in to manage your campus connections";
+                nameField.style.display = "none";
+                roleField.style.display = "none"; // Bypassed during login since backend routes calculate roles from DB
+                forgotLinkBlock.style.display = "block"; // Turn on forgot password accessibility
+                btnText.innerText = "Log In";
+                toggleDesc.innerText = "Don't have an account?";
+                toggleAction.innerText = "Sign Up";
+                document.getElementById('name').removeAttribute('required');
+                document.getElementById('role').removeAttribute('required');
+            } else {
+                authTitle.innerText = "Create Account";
+                authSubtitle.innerText = "Join our academic community today";
+                nameField.style.display = "flex";
+                roleField.style.display = "flex";
+                forgotLinkBlock.style.display = "none"; // Turn off forgot password link visibility
+                btnText.innerText = "Sign Up";
+                toggleDesc.innerText = "Already have an account?";
+                toggleAction.innerText = "Login";
+                document.getElementById('name').setAttribute('required', 'true');
+            }
+        }
+
+        function handleTogglePasswordView() {
+            const pwdInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eye-icon');
+            if (pwdInput.type === "password") {
+                pwdInput.type = "text";
+                eyeIcon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                pwdInput.type = "password";
+                eyeIcon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        // Account Recovery Modal Display Toggles
+        function openResetModal() {
+            document.getElementById('forgotPasswordModal').style.display = 'flex';
+        }
+
+        function closeResetModal() {
+            document.getElementById('forgotPasswordModal').style.display = 'none';
+            document.getElementById('forgotPasswordForm').reset();
+        }
+
+        // 🎯 LOGIC ACTION: SUBMIT ACTION HANDLER (Login vs Signup Routes)
+        async function handleSubmit(event) {
+            event.preventDefault();
+            const errMsg = document.getElementById('error-message');
+            errMsg.innerText = "";
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!isLoginMode) {
+                // 🛠️ REGISTER MODE: Enforce strict username layout filters to block numeric start signatures
+                const name = document.getElementById('name').value.trim();
+                const role = document.getElementById('role').value;
+
+                if (!role) {
+                    errMsg.innerText = "Please select an explicit account tracking role tier.";
+                    return;
+                }
+
+                const studentEmailRegex = /^[a-zA-Z][a-zA-Z0-9._]*@student\.edu$/;
+                const teacherEmailRegex = /^[a-zA-Z][a-zA-Z0-9._]*@teacher\.edu$/;
+
+                if (role === 'student' && !studentEmailRegex.test(email)) {
+                    errMsg.innerText = "Invalid Student Email! Must start with an alphabet letter and end with @student.edu (e.g., aarushi9@student.edu).";
+                    return;
+                }
+
+                if (role === 'teacher' && !teacherEmailRegex.test(email)) {
+                    errMsg.innerText = "Invalid Teacher Email! Must start with an alphabet letter and end with @teacher.edu.";
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/api/auth/signup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, email, password, role })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        alert("Account configured successfully! Redirecting you to login portal mode.");
+                        toggleAuth();
+                    } else {
+                        errMsg.innerText = data.message || "Registration checkpoint failed.";
+                    }
+                } catch (err) {
+                    errMsg.innerText = "Network pipeline connectivity interface timeout.";
+                }
+
+            } else {
+                // 🛠️ LOGIN MODE ROUTINE Execution Loop
+                try {
+                    const res = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        // Store verification session tokens locally across browser memory context frames
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('role', data.role);
+                        localStorage.setItem('email', data.email || email);
+
+                        // Route structural relocation based upon institutional authority tier
+                        if (data.role === 'teacher') {
+                            window.location.href = 'teacher.html';
+                        } else {
+                            window.location.href = 'student.html';
+                        }
+                    } else {
+                        errMsg.innerText = data.message || "Credential matching processing failed.";
+                    }
+                } catch (err) {
+                    errMsg.innerText = "Failed to communicate securely with target system API nodes.";
+                }
+            }
+        }
+
+        // 🎯 LOGIC ACTION: RUN SIMPLIFIED CREDENTIAL PATCH OVERRIDE
+        async function handlePasswordReset(event) {
+            event.preventDefault();
+            const email = document.getElementById('resetEmail').value.trim();
+            const newPassword = document.getElementById('resetNewPassword').value;
+
+            try {
+                const res = await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, newPassword })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    alert("Success! " + data.message);
+                    closeResetModal();
+                } else {
+                    alert("Error: " + data.message);
+                }
+            } catch (err) {
+                console.error("Forgot password frontend connection breakdown:", err);
+                alert("Communication error targeting authentication cluster.");
+            }
+        }
+    </script>
 </body>
 </html>

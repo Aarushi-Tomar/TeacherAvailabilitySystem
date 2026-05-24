@@ -17,16 +17,19 @@ router.get('/teachers', async (req, res) => {
         const currentMinute = istTime.getMinutes();
         const totalMinutesNow = (currentHour * 60) + currentMinute;
 
-        // Campus Bounds
-        const campusStart = (8 * 60) + 30; // 08:30 AM
-        const campusEnd = (17 * 60) + 30;  // 05:30 PM
+        // Campus Operational Bounds (08:30 AM to 05:10 PM / 17:10)
+        const campusStart = (8 * 60) + 30; 
+        const campusEnd = (17 * 60) + 10;  
+
+        // Determine if current execution is completely outside operating boundaries
+        const isOutsideCollegeHours = (totalMinutesNow < campusStart || totalMinutesNow > campusEnd);
 
         const dynamicTeachers = teachers.map(teacher => {
             let currentStatus = 'Off Campus';
-            let currentLocation = 'Out of Office';
+            let currentLocation = 'Off Campus';
 
             // Check if the current time is inside college hours
-            if (totalMinutesNow >= campusStart && totalMinutesNow <= campusEnd) {
+            if (!isOutsideCollegeHours) {
                 let foundActiveSlot = false;
 
                 // Loop through the 10 slots to find the active period
@@ -37,7 +40,7 @@ router.get('/teachers', async (req, res) => {
                     const slotStartMins = (startH * 60) + startM;
                     const slotEndMins = (endH * 60) + endM;
 
-                    if (totalMinutesNow >= slotStartMins && totalMinutesNow <= slotEndMins) {
+                    if (totalMinutesNow >= slotStartMins && totalMinutesNow < slotEndMins) {
                         currentStatus = slot.status;
                         currentLocation = slot.location;
                         foundActiveSlot = true;
@@ -45,25 +48,42 @@ router.get('/teachers', async (req, res) => {
                     }
                 }
 
-                // If inside college hours but matching NO slot, it's a 5-minute break period!
+                // If inside college hours but matching NO slot, it's a passing break period!
                 if (!foundActiveSlot) {
                     currentStatus = 'In Break';
                     currentLocation = 'Moving to Next Lecture';
                 }
             }
 
+            // 🎯 FORCED GRID OVERRIDE: 
+            // If it is late night/weekend, map every row item to safe offline modes
+            const processedTimetable = teacher.timetable.map(slot => {
+                if (isOutsideCollegeHours) {
+                    return {
+                        _id: slot._id,
+                        slotNumber: slot.slotNumber,
+                        startTime: slot.startTime,
+                        endTime: slot.endTime,
+                        status: "Not Available",
+                        location: "Off Campus"
+                    };
+                }
+                return slot;
+            });
+
             return {
                 _id: teacher._id,
                 name: teacher.name,
                 department: teacher.department || 'CSE',
                 status: currentStatus,
-                cabin: currentLocation // Mapping the dynamic location to your frontend's 'cabin' view
+                cabin: currentLocation, 
+                fullTimetable: processedTimetable // 🎯 Passed down so frontend dropdown can loop through it!
             };
         });
 
         res.status(200).json(dynamicTeachers);
     } catch (err) {
-        console.error(err);
+        console.error("Student side view processing error:", err);
         res.status(500).json({ message: "Error tracking live data" });
     }
 });
