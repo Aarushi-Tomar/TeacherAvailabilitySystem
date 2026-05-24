@@ -1,142 +1,78 @@
 const express = require('express');
-
 const router = express.Router();
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-const mongoose = require('mongoose');
-
-const User = mongoose.model('User');
-
-
-
-// GET all faculty with dynamic timetable calculations
-
+// Fetch all teachers with live calculated statuses and locations
 router.get('/teachers', async (req, res) => {
-
     try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ message: "Access denied. Missing token." });
+        }
 
+        const token = authHeader.split(' ')[1];
+        jwt.verify(token, process.env.JWT_SECRET || 'aarushi_secret_key_2026');
+
+        // Fetch all users whose role is 'teacher'
         const teachers = await User.find({ role: 'teacher' }).select('-password');
 
-
-
-        // Calculate Current Time details in Indian Standard Time (IST)
-
+        const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const now = new Date();
+        
+        // Convert to Indian Standard Time (IST) 24-hour format
+        const options = { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit' };
+        const currentTimeStr = now.toLocaleTimeString('en-US', options); 
+        let currentDayName = daysOfWeek[now.getDay()]; 
 
-        const istOffset = 5.5 * 60 * 60 * 1000;
+        // Core college operational hours boundary check
+        const isOutsideCollegeHours = (currentTimeStr < "08:30" || currentTimeStr > "17:10");
 
-        const istTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + istOffset);
+        const liveFacultyList = teachers.map(teacher => {
+            let currentStatus = "Off Campus";
+            let currentLocation = "Off Campus";
 
-       
+            const todaysSchedule = (teacher.timetable && teacher.timetable[currentDayName]) ? teacher.timetable[currentDayName] : [];
 
-        const currentHour = istTime.getHours();
+            // Find if there's a slot running right now
+            const activeSlot = todaysSchedule.find(slot => {
+                return currentTimeStr >= slot.startTime && currentTimeStr < slot.endTime;
+            });
 
-        const currentMinute = istTime.getMinutes();
-
-        const totalMinutesNow = (currentHour * 60) + currentMinute;
-
-
-
-        // Campus Bounds
-
-        const campusStart = (8 * 60) + 30; // 08:30 AM
-
-        const campusEnd = (17 * 60) + 30;  // 05:30 PM
-
-
-
-        const dynamicTeachers = teachers.map(teacher => {
-
-            let currentStatus = 'Off Campus';
-
-            let currentLocation = 'Out of Office';
-
-
-
-            // Check if the current time is inside college hours
-
-            if (totalMinutesNow >= campusStart && totalMinutesNow <= campusEnd) {
-
-                let foundActiveSlot = false;
-
-
-
-                // Loop through the 10 slots to find the active period
-
-                for (let slot of teacher.timetable) {
-
-                    const [startH, startM] = slot.startTime.split(':').map(Number);
-
-                    const [endH, endM] = slot.endTime.split(':').map(Number);
-
-                   
-
-                    const slotStartMins = (startH * 60) + startM;
-
-                    const slotEndMins = (endH * 60) + endM;
-
-
-
-                    if (totalMinutesNow >= slotStartMins && totalMinutesNow <= slotEndMins) {
-
-                        currentStatus = slot.status;
-
-                        currentLocation = slot.location;
-
-                        foundActiveSlot = true;
-
-                        break;
-
-                    }
-
-                }
-
-
-
-                // If inside college hours but matching NO slot, it's a 5-minute break period!
-
-                if (!foundActiveSlot) {
-
-                    currentStatus = 'In Break';
-
-                    currentLocation = 'Moving to Next Lecture';
-
-                }
-
+            // Only show active database updates if we are within operational hours
+            if (activeSlot && !isOutsideCollegeHours) {
+                currentStatus = activeSlot.status || "Off Campus";
+                currentLocation = activeSlot.location || "Cabin";
             }
 
-
+            // 🎯 FORCED GRID BACKEND OVERRIDE: 
+            // If it's night/weekend, map every single row to "Not Available" and "Off Campus"
+            const processedTimetable = todaysSchedule.map(slot => {
+                if (isOutsideCollegeHours) {
+                    return {
+                        ...slot._doc,
+                        status: "Not Available",
+                        location: "Off Campus"
+                    };
+                }
+                return slot;
+            });
 
             return {
-
                 _id: teacher._id,
-
                 name: teacher.name,
-
                 department: teacher.department || 'CSE',
-
                 status: currentStatus,
-
-                cabin: currentLocation // Mapping the dynamic location to your frontend's 'cabin' view
-
+                cabin: currentLocation,
+                fullTimetable: processedTimetable 
             };
-
         });
 
-
-
-        res.status(200).json(dynamicTeachers);
-
+        res.status(200).json(liveFacultyList);
     } catch (err) {
-
-        console.error(err);
-
-        res.status(500).json({ message: "Error tracking live data" });
-
+        console.error("Student portal tracking fetch error:", err);
+        res.status(500).json({ message: "Failed to pull live faculty listings due to a server fault." });
     }
-
 });
 
-
-
-module.exports = router; 
-
+module.exports = router;

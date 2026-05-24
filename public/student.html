@@ -1,196 +1,194 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Dashboard | TAS</title>
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <link rel="stylesheet" href="style.css">
-
+    <style>
+        .timetable-dropdown {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .timetable-dropdown.active {
+            max-height: 600px; /* Adjust as needed for 10 rows */
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+        }
+        .mini-grid-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        .mini-grid-table th, .mini-grid-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .view-schedule-btn {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .view-schedule-btn:hover {
+            background: #4f46e5;
+        }
+    </style>
 </head>
-
 <body style="display: block; height: auto;">
-
-    <main class="main-container" style="flex-direction: column; overflow-y: auto;">
-
-        <header style="background: var(--primary-grad); padding: 20px 40px; color: white; display: flex; justify-content: space-between; align-items: center;">
-
-            <h2 style="font-weight: 700;"><i class="fas fa-graduation-cap"></i> Student Portal</h2>
-
-            <a href="#" onclick="logout()" style="color: white; text-decoration: none; font-weight: 600;">Logout</a>
-
+    <main class="main-container" style="flex-direction: column; overflow-y: auto; height: auto; min-height: 100vh;">
+        <header style="background: var(--primary-grad); padding: 20px 40px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+            <h2 style="font-weight: 700; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-graduation-cap"></i> Student Portal
+            </h2>
+            <a href="javascript:void(0)" onclick="logout()" style="color: white; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
         </header>
 
-
-
         <section style="padding: 40px; display: flex; flex-direction: column; align-items: center;">
-
-            <div class="form-header" style="text-align: center;">
-
-                <h2>Search Faculty</h2>
-
-                <p>Real-time availability based on timetable and manual updates</p>
-
+            <div class="form-header" style="text-align: center; margin-bottom: 25px;">
+                <h2>Search Faculty Availability</h2>
+                <p>View real-time status or click to see their entire daily schedule matrix.</p>
             </div>
 
-
-
-            <div class="input-field" style="width: 100%; max-width: 600px; margin-bottom: 30px;">
-
+            <div class="input-field" style="width: 100%; max-width: 600px; margin-bottom: 30px; position: relative;">
                 <i class="fas fa-search"></i>
-
-                <input type="text" id="teacherSearch" placeholder="Search teacher, department, or cabin..." onkeyup="filterTeachers()">
-
+                <input type="text" id="teacherSearch" placeholder="Search teacher by name or department...">
             </div>
 
-
-
-            <div id="teacher-list" style="width: 100%; max-width: 800px;">
-
-                </div>
-
+            <div id="teacher-list" style="width: 100%; max-width: 800px;"></div>
         </section>
-
     </main>
 
-
-
     <script>
+        let allTeachers = []; 
 
-        let allTeachers = []; // Store teachers here for searching
+        const token = localStorage.getItem('token');
+        if (!token) {
+            alert("Session expired or unauthorized. Please log in again.");
+            window.location.href = 'index.html';
+        }
 
+        async function fetchTeachers() {
+            try {
+                const res = await fetch('/api/student/teachers', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                allTeachers = await res.json();
+                renderTeachers(allTeachers);
+            } catch (err) {
+                console.error("Failed to load teachers.");
+            }
+        }
 
-
-async function fetchTeachers() {
-
-    try {
-
-        const res = await fetch(`${BASE_URL}/api/student/teachers`);
-
-        allTeachers = await res.json();
-
-        renderTeachers(allTeachers);
-
-    } catch (err) {
-
-        console.error("Failed to load teachers. Check if backend is running.");
-
-    }
-
-}
-
-
-
-function renderTeachers(teachers) {
-
+        function renderTeachers(teachers) {
     const container = document.getElementById('teacher-list');
-
-   
-
     if (teachers.length === 0) {
-
-        container.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No faculty found matching your search.</p>`;
-
+        container.innerHTML = `<p style="text-align:center; color:var(--text-muted); margin-top: 20px;">No faculty found.</p>`;
         return;
-
     }
 
+    container.innerHTML = teachers.map((t, index) => {
+        const computedStatus = t.status || 'Off Campus';
+        const computedLocation = t.cabin || 'Off Campus';
 
+        // Map rows directly from our newly protective backend process array
+        const timetableRows = t.fullTimetable && t.fullTimetable.length > 0 
+            ? t.fullTimetable.map(s => `
+                <tr>
+                    <td style="font-weight:600; color:#4f46e5;">Period ${s.slotNumber}</td>
+                    <td style="color:#64748b;">${s.startTime} - ${s.endTime}</td>
+                    <td><span style="color:${getStatusColor(s.status)}; font-weight:700;">● ${s.status}</span></td>
+                    <td><strong>${s.location || 'Off Campus'}</strong></td>
+                </tr>
+            `).join('')
+            : `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No schedule configured yet.</td></tr>`;
 
-    container.innerHTML = teachers.map(t => `
-
-        <div class="auth-card teacher-card" style="max-width: 100%; margin-bottom: 15px; padding: 25px; display: flex; justify-content: space-between; align-items: center; border-left: 6px solid ${getStatusColor(t.status)}">
-
-            <div>
-
-                <h3 style="color: var(--text-main); margin-bottom: 4px;">${t.name}</h3>
-
-                <p style="font-size: 0.9rem; color: var(--text-muted);"><i class="fas fa-building" style="margin-right: 8px;"></i>${t.cabin}</p>
-
-                <p style="font-size: 0.8rem; color: #6366f1; font-weight: 600; text-transform: uppercase;">${t.department}</p>
-
+        return `
+        <div class="auth-card teacher-card" style="max-width: 100%; margin-bottom: 20px; padding: 25px; border-left: 6px solid ${getStatusColor(computedStatus)}; display:block;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="color: var(--text-main); margin-bottom: 6px; font-size: 1.2rem; font-weight: 700;">${t.name}</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-map-marker-alt" style="color: #6366f1;"></i> 
+                        <span>Right Now: <strong>${computedLocation}</strong></span>
+                    </p>
+                    <p style="font-size: 0.8rem; color: #a855f7; font-weight: 600; text-transform: uppercase; margin-bottom: 10px;">${t.department || 'CSE'}</p>
+                    <button class="view-schedule-btn" onclick="toggleSchedule(${index})">
+                        <i class="fas fa-calendar-alt"></i> View Full Schedule
+                    </button>
+                </div>
+                <div style="text-align: right;">
+                    <span style="background: ${getBgColor(computedStatus)}; color: ${getStatusColor(computedStatus)}; padding: 8px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; display: inline-block;">
+                        ● ${computedStatus.toUpperCase()}
+                    </span>
+                </div>
             </div>
 
-            <div style="text-align: right;">
-
-                <span style="background: ${getBgColor(t.status)}; color: ${getStatusColor(t.status)}; padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 800;">● ${t.status.toUpperCase()}</span>
-
+            <div id="dropdown-${index}" class="timetable-dropdown">
+                <h4 style="margin-bottom: 10px; color: var(--text-main); font-size: 0.9rem;"><i class="fas fa-clock"></i> Complete Day Schedule</h4>
+                <table class="mini-grid-table">
+                    <thead>
+                        <tr style="background: #f1f5f9;">
+                            <th>Period</th>
+                            <th>Timing</th>
+                            <th>Status</th>
+                            <th>Room/Location</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${timetableRows}
+                    </tbody>
+                </table>
             </div>
-
         </div>
-
-    `).join('');
-
+        `;
+    }).join('');
 }
-
-
-
-// Search Logic
-
-document.getElementById('teacherSearch').addEventListener('input', (e) => {
-
-    const term = e.target.value.toLowerCase();
-
-    const filtered = allTeachers.filter(t =>
-
-        t.name.toLowerCase().includes(term) ||
-
-        t.department.toLowerCase().includes(term) ||
-
-        t.cabin.toLowerCase().includes(term)
-
-    );
-
-    renderTeachers(filtered);
-
-});
-
-
 
 function getStatusColor(status) {
-
-    const colors = { 'Available': '#10b981', 'In Class': '#ef4444', 'Busy': '#ef4444', 'In Meeting': '#f59e0b', 'Off Campus': '#64748b' };
-
+    const colors = { 
+        'Available': '#10b981', 
+        'In Class': '#ef4444', 
+        'Busy': '#f59e0b', 
+        'In Break': '#8b5cf6', 
+        'Off Campus': '#64748b',
+        'Not Available': '#ef4444' 
+    };
     return colors[status] || '#64748b';
-
 }
-
-
 
 function getBgColor(status) {
-
-    const bgs = { 'Available': '#d1fae5', 'In Class': '#fee2e2', 'Busy': '#fee2e2', 'In Meeting': '#fef3c7', 'Off Campus': '#f1f5f9' };
-
+    const bgs = { 
+        'Available': '#d1fae5', 
+        'In Class': '#fee2e2', 
+        'Busy': '#fef3c7', 
+        'In Break': '#ede9fe', 
+        'Off Campus': '#f1f5f9',
+        'Not Available': '#fee2e2'
+    };
     return bgs[status] || '#f1f5f9';
-
 }
 
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
 
-
-function logout() {
-
-    localStorage.clear();
-
-    window.location.href = 'index.html';
-
-}
-
-
-
-// Initial load and auto-refresh
-
-fetchTeachers();
-
-setInterval(fetchTeachers, 30000);
-
+        fetchTeachers();
+        setInterval(fetchTeachers, 30000); 
     </script>
-
 </body>
-
-</html> 
-
+</html>
