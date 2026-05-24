@@ -16,7 +16,6 @@ router.get('/teachers', async (req, res) => {
 
         const teachers = await User.find({ role: 'teacher' }).select('-password');
 
-        // 🌟 FIXED: Changed map array to 3-letter shorthands to match User.js schema fields
         const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const now = new Date();
         
@@ -28,39 +27,50 @@ router.get('/teachers', async (req, res) => {
         const isSunday = (currentDayName === 'Sun');
 
         const liveFacultyList = teachers.map(teacher => {
-            let currentStatus = "Off Campus";
+            let currentStatus = "Not Available";
             let currentLocation = "Off Campus";
 
-            const dayDocument = teacher.timetable ? teacher.timetable.find(t => t.day === currentDayName) : null;
-            const todaysSlots = dayDocument ? dayDocument.slots : [];
-
-            const activeSlot = todaysSlots.find(slot => {
-                return currentTimeStr >= slot.startTime && currentTimeStr < slot.endTime;
-            });
-
-            if (isOutsideCollegeHours || isSunday) {
+            // 1. Check if there's an active global manual override rule set by the teacher first
+            if (teacher.manualStatus && teacher.manualStatus !== "None") {
+                currentStatus = teacher.manualStatus;
+                currentLocation = (teacher.manualStatus === "Off Campus") ? "Off Campus" : (teacher.cabin || "Main Cabin");
+            } 
+            // 2. If it is Sunday or outside working hours, default to Not Available
+            else if (isOutsideCollegeHours || isSunday) {
                 currentStatus = "Not Available";
                 currentLocation = "Off Campus";
-            } else if (activeSlot) {
-                currentStatus = activeSlot.status || "Available";
-                currentLocation = activeSlot.location || "Cabin";
-            } else {
-                currentStatus = "In Break";
-                currentLocation = "Passing Corridor";
+            } 
+            // 3. Within working hours: inspect the timetable arrays to grab the active block slot
+            else {
+                const dayDocument = teacher.timetable ? teacher.timetable.find(t => t.day === currentDayName) : null;
+                const todaysSlots = dayDocument ? dayDocument.slots : [];
+
+                const activeSlot = todaysSlots.find(slot => {
+                    return currentTimeStr >= slot.startTime && currentTimeStr < slot.endTime;
+                });
+
+                if (activeSlot) {
+                    currentStatus = slot.status || "Not Available";
+                    currentLocation = slot.location || "Off Campus";
+                } else {
+                    // Default fallback if time is within college hours but explicitly unconfigured or a break slot
+                    currentStatus = "Not Available";
+                    currentLocation = "Off Campus";
+                }
             }
 
+            // 🌟 FIXED: Keep the pristine, full schedule untouched so students can view the layout anytime!
             const processedTimetable = teacher.timetable.map(dayGroup => {
                 return {
                     day: dayGroup.day,
                     slots: dayGroup.slots.map(slot => {
-                        if (isOutsideCollegeHours || isSunday) {
-                            return {
-                                ...slot._doc,
-                                status: "Not Available",
-                                location: "Off Campus"
-                            };
-                        }
-                        return slot;
+                        return {
+                            slotNumber: slot.slotNumber,
+                            startTime: slot.startTime,
+                            endTime: slot.endTime,
+                            status: slot.status,
+                            location: slot.location
+                        };
                     })
                 };
             });
@@ -70,7 +80,7 @@ router.get('/teachers', async (req, res) => {
                 name: teacher.name,
                 department: teacher.department || 'CSE',
                 status: currentStatus,
-                cabin: teacher.cabin || currentLocation, 
+                cabin: teacher.cabin || "Not Assigned", 
                 liveLocation: currentLocation,           
                 fullTimetable: processedTimetable 
             };
