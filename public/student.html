@@ -131,7 +131,6 @@
             }
         }
 
-        // Live Frontend Filter Engine Hook
         function filterAndRender() {
             const query = document.getElementById('teacherSearch').value.toLowerCase().trim();
             const filtered = allTeachers.filter(t => 
@@ -154,7 +153,6 @@
                 const computedStatus = t.status || 'Off Campus';
                 const globalCabin = t.cabin || 'Off Campus';
 
-                // Reconstruct Tab Menus and Nested Day Rows cleanly
                 let dayTabButtonsHTML = '';
                 let dailyPanelsHTML = '';
 
@@ -166,7 +164,8 @@
                         </button>
                     `;
 
-                    const targetedDayDoc = t.fullTimetable ? t.fullTimetable.find(d => d.day === day) : null;
+                    // 🛠️ FIX 1: Changed from t.fullTimetable to t.timetable to mirror the Mongoose schema keys
+                    const targetedDayDoc = t.timetable ? t.timetable.find(d => d.day === day) : null;
                     const slotsToRender = targetedDayDoc ? targetedDayDoc.slots : [];
 
                     let slotRowsHTML = '';
@@ -176,7 +175,7 @@
                                 <td style="font-weight:600; color:#4f46e5;">Period ${s.slotNumber}</td>
                                 <td style="color:#64748b;">${s.startTime} - ${s.endTime}</td>
                                 <td><span style="color:${getStatusColor(s.status)}; font-weight:700;">● ${s.status}</span></td>
-                                <td><strong>${s.location || 'Cabin'}</strong></td>
+                                <td><strong>${s.location || 'Off Campus'}</strong></td>
                             </tr>
                         `).join('');
                     } else {
@@ -212,7 +211,7 @@
                                 <span>Designated Cabin: <strong>${globalCabin}</strong></span>
                             </p>
                             <p style="font-size: 0.8rem; color: #a855f7; font-weight: 600; text-transform: uppercase; margin-bottom: 10px;">
-                                Dept: ${t.department || 'CSE'} | Current Action: <span style="color: ${getStatusColor(computedStatus)}; font-weight: 700;">${t.liveLocation || computedStatus}</span>
+                                Dept: ${t.department || 'CSE'}
                             </p>
                             <button class="view-schedule-btn" onclick="toggleSchedule(${index})">
                                 <i class="fas fa-calendar-alt"></i> View Weekly Grid
@@ -241,21 +240,18 @@
             el.classList.toggle('active');
         }
 
-        // Tab Switching Engine Handler
         function switchDayTab(event, targetDay, teacherCardIndex) {
-            event.stopPropagation(); // Avoid parent accordion click conflicts
+            event.stopPropagation(); 
             const dropdown = document.getElementById(`dropdown-${teacherCardIndex}`);
             
-            // Un-assign previous button states
             dropdown.querySelectorAll('.day-tab-btn').forEach(btn => btn.classList.remove('active'));
-            // Un-assign previous viewport dashboards
             dropdown.querySelectorAll('.day-panel').forEach(p => p.classList.remove('active'));
 
-            // Toggle selected item
             event.currentTarget.classList.add('active');
             dropdown.querySelector(`.panel-${targetDay}`).classList.add('active');
         }
 
+        // 🛠️ FIX 2: Remapped 'Not Available' to a clean visual slate slate-gray style color mapping
         function getStatusColor(status) {
             const colors = { 
                 'Available': '#10b981', 
@@ -263,7 +259,7 @@
                 'Busy': '#f59e0b', 
                 'In Break': '#8b5cf6', 
                 'Off Campus': '#64748b',
-                'Not Available': '#ef4444' 
+                'Not Available': '#64748b' 
             };
             return colors[status] || '#64748b';
         }
@@ -275,7 +271,7 @@
                 'Busy': '#fef3c7', 
                 'In Break': '#ede9fe', 
                 'Off Campus': '#f1f5f9',
-                'Not Available': '#fee2e2'
+                'Not Available': '#f1f5f9'
             };
             return bgs[status] || '#f1f5f9';
         }
@@ -285,7 +281,6 @@
             window.location.href = 'index.html';
         }
 
-        // Initialize App Feed
         fetchTeachers();
         setInterval(fetchTeachers, 30000); 
     </script>

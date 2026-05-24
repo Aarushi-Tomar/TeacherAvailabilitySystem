@@ -4,9 +4,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// ========================
+// ==========================================
 // 1. SIGNUP ROUTE
-// ========================
+// ==========================================
 router.post('/signup', async (req, res) => {
     try {
         const { name, email, password, role } = req.body;
@@ -35,13 +35,11 @@ router.post('/signup', async (req, res) => {
             return res.status(400).json({ message: "User already registered" });
         }
 
-        // 🔒 Explicitly hash the password securely before saving to DB
-        const hashedPassword = await bcrypt.hash(password, 10);
-
+        // Pass the raw text down—the schema pre-save handler hashes this securely!
         const newUser = new User({
             name,
             email: emailLower,
-            password: hashedPassword,
+            password: password, 
             role
         });
 
@@ -53,9 +51,9 @@ router.post('/signup', async (req, res) => {
     }
 });
 
-// ========================
+// ==========================================
 // 2. REINFORCED LOGIN ROUTE
-// ========================
+// ==========================================
 router.post('/login', async (req, res) => {
     try {
         const { email, password, role } = req.body;
@@ -77,7 +75,7 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // 🛑 DOMAIN SECURITY HARDENING: Extra validation check against old or modified database documents
+        // 🛑 DOMAIN SECURITY HARDENING: Extra validation check against database document structures
         if (user.role === 'teacher' && !emailLower.endsWith('@teacher.edu')) {
             return res.status(403).json({ message: "Access Denied: Invalid account credentials structure." });
         }
@@ -108,9 +106,9 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// ===================================
-// 3. 🔑 SIMPLIFIED FORGOT PASSWORD ROUTE
-// ===================================
+// ==========================================
+// 3. 🔑 SECURED FORGOT PASSWORD ROUTE
+// ==========================================
 router.post('/forgot-password', async (req, res) => {
     try {
         const { email, newPassword } = req.body;
@@ -120,18 +118,13 @@ router.post('/forgot-password', async (req, res) => {
         }
 
         const emailLower = email.toLowerCase().trim();
-
-        // Check if user exists in our records
         const user = await User.findOne({ email: emailLower });
         if (!user) {
             return res.status(404).json({ message: "No account found with this email address." });
         }
 
-        // Hash the new password securely
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        
-        // Update password directly
-        user.password = hashedPassword;
+        // Set the raw string. The model's updated .isModified pre-save hook handles the hashing safely.
+        user.password = newPassword; 
         await user.save();
 
         res.status(200).json({ message: "Password updated successfully! You can now log in with your new password." });

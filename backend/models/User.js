@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 // Single Period Slot Schema
 const TimetableSlotSchema = new mongoose.Schema({
@@ -7,10 +8,13 @@ const TimetableSlotSchema = new mongoose.Schema({
     endTime: { type: String, required: true },    // e.g., "09:20"
     status: { 
         type: String, 
-        default: 'Available', 
+        default: 'Not Available', 
         enum: ['Available', 'In Class', 'Busy', 'Off Campus', 'Not Available'] 
     },
-    location: { type: String, default: 'Cabin' }  // Dynamic room/lab/cabin venue tracking
+    location: { 
+        type: String, 
+        default: 'Off Campus' 
+    }
 });
 
 // Daily Wrapper Schema to construct the Weekly Matrix
@@ -30,37 +34,57 @@ const UserSchema = new mongoose.Schema({
     password: { type: String, required: true },
     role: { type: String, enum: ['student', 'teacher'], required: true },
     department: { type: String, default: 'CSE' },
-    cabin: { type: String, default: 'Not Assigned' }, // Global anchor state backup tracker
+    cabin: { type: String, default: 'Not Assigned' }, 
+    
+    // Persists manual status bypass selections from dropdown selectors
+    manualStatus: { 
+        type: String, 
+        enum: ['None', 'Available', 'Busy', 'In Class', 'Off Campus'], 
+        default: 'None' 
+    },
 
-    // 🔄 Nested Weekly Matrix array (Only populated for teacher accounts)
+    // Nested Weekly Matrix array (Only populated for teacher accounts)
     timetable: [DailyScheduleSchema]
 }, { timestamps: true });
 
-// 🛠️ PRE-POPULATE HOOK: Automatically seeds all 7 days with your 10 unique time blocks
-UserSchema.pre('save', function(next) {
-    if (this.role === 'teacher' && this.timetable.length === 0) {
+// 🛠️ UNIFIED PRE-SAVE HOOK: Handles Safe Password Hashing & Timetable Seeding
+UserSchema.pre('save', async function(next) {
+    // 🔒 SECTION A: SAFE PASSWORD HASHING GUARD
+    if (this.isModified('password')) {
+        try {
+            // Check if it's already a bcrypt hash (starts with $2a$ or $2b$) to prevent double hashing
+            if (!this.password.startsWith('$2a$') && !this.password.startsWith('$2b$')) {
+                const salt = await bcrypt.genSalt(10);
+                this.password = await bcrypt.hash(this.password, salt);
+            }
+        } catch (err) {
+            return next(err);
+        }
+    }
+
+    // 🔄 SECTION B: AUTOMATIC TEACHER TIMETABLE INITIALIZATION
+    if (this.role === 'teacher' && (!this.timetable || this.timetable.length === 0)) {
         const targetDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         
-        // Your true institutional 10-period daily execution matrix block
         const getDailySlotsFactory = () => [
-            { slotNumber: 1, startTime: "08:30", endTime: "09:20" },
-            { slotNumber: 2, startTime: "09:20", endTime: "10:10" },
-            { slotNumber: 3, startTime: "10:15", endTime: "11:05" },
-            { slotNumber: 4, startTime: "11:05", endTime: "11:55" },
-            { slotNumber: 5, startTime: "12:00", endTime: "12:50" },
-            { slotNumber: 6, startTime: "12:50", endTime: "13:40" },
-            { slotNumber: 7, startTime: "13:45", endTime: "14:35" },
-            { slotNumber: 8, startTime: "14:35", endTime: "15:25" },
-            { slotNumber: 9, startTime: "15:30", endTime: "16:20" },
-            { slotNumber: 10, startTime: "16:20", endTime: "17:10" }
+            { slotNumber: 1, startTime: "08:30", endTime: "09:20", status: "Not Available", location: "Off Campus" },
+            { slotNumber: 2, startTime: "09:20", endTime: "10:10", status: "Not Available", location: "Off Campus" },
+            { slotNumber: 3, startTime: "10:15", endTime: "11:05", status: "Not Available", location: "Off Campus" },
+            { slotNumber: 4, startTime: "11:05", endTime: "11:55", status: "Not Available", location: "Off Campus" },
+            { slotNumber: 5, startTime: "12:00", endTime: "12:50", status: "Not Available", location: "Off Campus" },
+            { slotNumber: 6, startTime: "12:50", endTime: "13:40", status: "Not Available", location: "Off Campus" },
+            { slotNumber: 7, startTime: "13:45", endTime: "14:35", status: "Not Available", location: "Off Campus" },
+            { slotNumber: 8, startTime: "14:35", endTime: "15:25", status: "Not Available", location: "Off Campus" },
+            { slotNumber: 9, startTime: "15:30", endTime: "16:20", status: "Not Available", location: "Off Campus" },
+            { slotNumber: 10, startTime: "16:20", endTime: "17:10", status: "Not Available", location: "Off Campus" }
         ];
 
-        // Seed every single tracking calendar day array cleanly
         this.timetable = targetDays.map(dayName => ({
             day: dayName,
             slots: getDailySlotsFactory()
         }));
     }
+
     next();
 });
 
