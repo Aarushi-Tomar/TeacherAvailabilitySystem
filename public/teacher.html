@@ -150,7 +150,7 @@
 
     <script>
         const token = localStorage.getItem('token');
-        const email = localStorage.getItem('email'); // Ensure you set this on login inside script.js
+        const email = localStorage.getItem('email'); 
         const targetDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         let teacherProfileMatrix = [];
 
@@ -208,15 +208,17 @@
                     </button>
                 `;
 
-                // Find saved sub-document rows or seed blank templates
+                // Find saved sub-document rows or seed unconfigured data defaults cleanly
                 const dayDoc = teacherProfileMatrix.find(d => d.day === day);
                 const savedSlots = dayDoc ? dayDoc.slots : [];
 
                 let tableRowsHTML = '';
                 standardTimeBlocks.forEach(block => {
                     const savedSlot = savedSlots.find(s => s.slotNumber === block.slotNumber);
-                    const runningStatus = savedSlot ? savedSlot.status : 'Available';
-                    const runningLocation = savedSlot ? savedSlot.location : 'Cabin';
+                    
+                    // 🔒 DEFENSIVE DEFALTS: Set to 'Not Available' and 'Off Campus' if unconfigured by professor
+                    const runningStatus = savedSlot ? savedSlot.status : 'Not Available';
+                    const runningLocation = savedSlot ? savedSlot.location : 'Off Campus';
 
                     tableRowsHTML += `
                         <tr class="slot-row" data-slot="${block.slotNumber}" data-start="${block.startTime}" data-end="${block.endTime}">
@@ -224,6 +226,7 @@
                             <td style="color:#64748b; font-size:0.8rem;">${block.startTime} - ${block.endTime}</td>
                             <td>
                                 <select class="matrix-select slot-status">
+                                    <option value="Not Available" ${runningStatus === 'Not Available' ? 'selected' : ''}>Not Available</option>
                                     <option value="Available" ${runningStatus === 'Available' ? 'selected' : ''}>Available</option>
                                     <option value="In Class" ${runningStatus === 'In Class' ? 'selected' : ''}>In Class</option>
                                     <option value="Busy" ${runningStatus === 'Busy' ? 'selected' : ''}>Busy</option>
@@ -271,6 +274,8 @@
 
             targetDays.forEach(day => {
                 const panel = document.getElementById(`panel-${day}`);
+                if (!panel) return;
+
                 const slotRows = panel.querySelectorAll('.slot-row');
                 const slotsArray = [];
 
@@ -280,7 +285,7 @@
                         startTime: row.getAttribute('data-start'),
                         endTime: row.getAttribute('data-end'),
                         status: row.querySelector('.slot-status').value,
-                        location: row.querySelector('.slot-location').value || 'Cabin'
+                        location: row.querySelector('.slot-location').value || 'Off Campus'
                     });
                 });
 
@@ -291,6 +296,7 @@
             });
 
             try {
+                // Synchronized database endpoint route target matching backend structure
                 const res = await fetch('/api/teacher/update-timetable', {
                     method: 'POST',
                     headers: {
@@ -299,20 +305,55 @@
                     },
                     body: JSON.stringify({ email: email, updatedTimetable: compiledTimetablePayload })
                 });
+                
                 const responseData = await res.json();
-                alert(responseData.message || "Matrix updated successfully!");
+                
+                if (res.ok) {
+                    alert(responseData.message || "Matrix updated successfully!");
+                } else {
+                    alert("Error: " + (responseData.message || "Failed to update schedule structure."));
+                }
             } catch (err) {
                 alert("Failed to save changes to cloud database.");
             }
         }
 
-        // Placeholder fallback operations for independent state items
+        // Quick Global Cabin handler
         async function saveGlobalCabin() {
-            alert("Base Cabin coordinate saved successfully!");
+            const cabinValue = document.getElementById('globalCabin').value;
+            try {
+                const res = await fetch('/api/teacher/update-cabin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ email: email, cabin: cabinValue })
+                });
+                const data = await res.json();
+                alert(data.message || "Base cabin location successfully updated!");
+            } catch (err) {
+                alert("Failed to update base cabin coordinate.");
+            }
         }
 
+        // Manual Override handler
         async function updateManualStatus() {
-            alert("Override threshold settings updated!");
+            const statusValue = document.getElementById('manualStatus').value;
+            try {
+                const res = await fetch('/api/teacher/update-status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ email: email, manualStatus: statusValue })
+                });
+                const data = await res.json();
+                alert(data.message || "Global manual override rule successfully applied!");
+            } catch (err) {
+                alert("Failed to fire active temporary status override request.");
+            }
         }
 
         function logout() {
