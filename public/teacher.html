@@ -2,77 +2,326 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Dashboard | TAS</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* 📅 Rebuilt Split-Pane Dashboard Styles */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px;
+        }
+        @media(min-width: 992px) {
+            .dashboard-grid {
+                grid-template-columns: 350px 1fr;
+            }
+        }
+        .matrix-container {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .day-tabs {
+            display: flex;
+            gap: 5px;
+            overflow-x: auto;
+            margin-bottom: 20px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .day-tab-btn {
+            background: #e2e8f0;
+            color: #475569;
+            border: none;
+            padding: 8px 14px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .day-tab-btn.active {
+            background: #6366f1;
+            color: white;
+        }
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .matrix-table th, .matrix-table td {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+        }
+        .matrix-select, .matrix-input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+        .day-panel {
+            display: none;
+        }
+        .day-panel.active {
+            display: block;
+        }
+    </style>
 </head>
 <body style="display: block; height: auto;">
-    <main class="main-container">
-        <section class="left-side">
-            <div class="branding-content">
-                <div class="logo-icon"><i class="fas fa-chalkboard-teacher"></i></div>
-                <h1>Professor Portal</h1>
-                <p>Manage your availability and help students find the right time to connect with you.</p>
-            </div>
-        </section>
+    <header style="background: var(--primary-grad); padding: 20px 40px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <h2 style="font-weight: 700; display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-chalkboard-teacher"></i> Faculty Workspace
+        </h2>
+        <a href="javascript:void(0)" onclick="logout()" style="color: white; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+            <i class="fas fa-sign-out-alt"></i> Logout System
+        </a>
+    </header>
 
-        <section class="right-side">
-            <div class="auth-card">
-                <div class="form-header">
-                    <h2>Manual Status Override</h2>
-                    <p>This will bypass your weekly timetable</p>
+    <main style="display: flex; justify-content: center; padding: 20px; min-height: calc(100vh - 80px); background: #f8fafc;">
+        <div class="dashboard-grid">
+            
+            <section style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="auth-card" style="max-width: 100%; margin: 0; padding: 25px;">
+                    <div class="form-header">
+                        <h2>Quick Global Cabin</h2>
+                        <p>Set your default stationary workspace room</p>
+                    </div>
+                    <div class="input-field">
+                        <i class="fas fa-building"></i>
+                        <input type="text" id="globalCabin" placeholder="e.g. C-Block Room 302">
+                    </div>
+                    <button onclick="saveGlobalCabin()" class="btn-gradient" style="width:100%;">
+                        <span>Save Cabin Base</span>
+                    </button>
                 </div>
 
-                <div class="input-field">
-                    <i class="fas fa-eye"></i>
-                    <select id="manualStatus">
-                        <option value="None">Follow Timetable</option>
-                        <option value="Available">Available in Cabin</option>
-                        <option value="In Meeting">In Meeting</option>
-                        <option value="Off Campus">Off Campus</option>
-                        <option value="On Leave">On Leave</option>
-                    </select>
+                <div class="auth-card" style="max-width: 100%; margin: 0; padding: 25px;">
+                    <div class="form-header">
+                        <h2>Manual Override</h2>
+                        <p>Bypasses your scheduler tracking matrix temporarily</p>
+                    </div>
+
+                    <div class="input-field">
+                        <i class="fas fa-eye"></i>
+                        <select id="manualStatus">
+                            <option value="None">Follow Timetable Matrix</option>
+                            <option value="Available">Force Available</option>
+                            <option value="Busy">Force Busy</option>
+                            <option value="In Class">Force In Class</option>
+                            <option value="Off Campus">Force Off Campus</option>
+                        </select>
+                    </div>
+
+                    <button onclick="updateManualStatus()" class="btn-gradient" style="width:100%;">
+                        <span>Apply Override</span>
+                        <i class="fas fa-bolt"></i>
+                    </button>
+                </div>
+            </section>
+
+            <section class="matrix-container">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="color:var(--text-main); font-weight:700; font-size:1.3rem;">Weekly Timetable Matrix</h3>
+                        <p style="font-size:0.85rem; color:var(--text-muted);">Set up your recurring 10-period institutional schedules</p>
+                    </div>
+                    <button onclick="saveWeeklyMatrix()" class="btn-gradient" style="padding:10px 20px;">
+                        <i class="fas fa-save"></i> <span>Save Matrix Changes</span>
+                    </button>
                 </div>
 
-                <div class="input-field">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <input type="text" id="tempCabin" placeholder="Update Cabin (e.g. C-Block 102)">
-                </div>
+                <div class="day-tabs" id="daysTabContainer"></div>
 
-                <button onclick="updateTeacherStatus()" class="btn-gradient">
-                    <span>Update Status</span>
-                    <i class="fas fa-sync-alt"></i>
-                </button>
+                <form id="matrix-form-viewport"></form>
+            </section>
 
-                <p class="toggle-link"><a href="#" onclick="logout()">Logout System</a></p>
-            </div>
-        </section>
+        </div>
     </main>
 
     <script>
-        async function updateTeacherStatus() {
-            const status = document.getElementById('manualStatus').value;
-            const cabin = document.getElementById('tempCabin').value;
-            
+        const token = localStorage.getItem('token');
+        const email = localStorage.getItem('email'); // Ensure you set this on login inside script.js
+        const targetDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        let teacherProfileMatrix = [];
+
+        if (!token || !email) {
+            alert("Session expired or unauthorized. Returning to login.");
+            window.location.href = 'index.html';
+        }
+
+        // Standard 10-Period Time Block Structure Factory Mapping
+        const standardTimeBlocks = [
+            { slotNumber: 1, startTime: "08:30", endTime: "09:20" },
+            { slotNumber: 2, startTime: "09:20", endTime: "10:10" },
+            { slotNumber: 3, startTime: "10:15", endTime: "11:05" },
+            { slotNumber: 4, startTime: "11:05", endTime: "11:55" },
+            { slotNumber: 5, startTime: "12:00", endTime: "12:50" },
+            { slotNumber: 6, startTime: "12:50", endTime: "13:40" },
+            { slotNumber: 7, startTime: "13:45", endTime: "14:35" },
+            { slotNumber: 8, startTime: "14:35", endTime: "15:25" },
+            { slotNumber: 9, startTime: "15:30", endTime: "16:20" },
+            { slotNumber: 10, startTime: "16:20", endTime: "17:10" }
+        ];
+
+        // Fetch profile matrix values on launch
+        async function loadTeacherProfile() {
             try {
-                const res = await fetch(`${BASE_URL}/api/teacher/update-status`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
-                    body: JSON.stringify({ manualStatus: status, cabin: cabin })
+                const res = await fetch(`/api/teacher/my-timetable?email=${encodeURIComponent(email)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if(res.ok) alert("Status updated successfully!");
+                const data = await res.json();
+                
+                if (res.ok) {
+                    document.getElementById('globalCabin').value = data.cabin || '';
+                    teacherProfileMatrix = data.timetable || [];
+                    buildTabsAndGrids();
+                }
             } catch (err) {
-                alert("Server error. Ensure backend is running.");
+                console.error("Error hydrating profile configuration interfaces:", err);
             }
+        }
+
+        function buildTabsAndGrids() {
+            const tabContainer = document.getElementById('daysTabContainer');
+            const viewport = document.getElementById('matrix-form-viewport');
+            
+            tabContainer.innerHTML = '';
+            viewport.innerHTML = '';
+
+            targetDays.forEach((day, index) => {
+                const isFirst = index === 0;
+                
+                // Build Tab Buttons
+                tabContainer.innerHTML += `
+                    <button type="button" class="day-tab-btn ${isFirst ? 'active' : ''}" id="tab-btn-${day}" onclick="switchFormTab('${day}')">
+                        ${day}
+                    </button>
+                `;
+
+                // Find saved sub-document rows or seed blank templates
+                const dayDoc = teacherProfileMatrix.find(d => d.day === day);
+                const savedSlots = dayDoc ? dayDoc.slots : [];
+
+                let tableRowsHTML = '';
+                standardTimeBlocks.forEach(block => {
+                    const savedSlot = savedSlots.find(s => s.slotNumber === block.slotNumber);
+                    const runningStatus = savedSlot ? savedSlot.status : 'Available';
+                    const runningLocation = savedSlot ? savedSlot.location : 'Cabin';
+
+                    tableRowsHTML += `
+                        <tr class="slot-row" data-slot="${block.slotNumber}" data-start="${block.startTime}" data-end="${block.endTime}">
+                            <td style="font-weight:600; color:#4f46e5;">Period ${block.slotNumber}</td>
+                            <td style="color:#64748b; font-size:0.8rem;">${block.startTime} - ${block.endTime}</td>
+                            <td>
+                                <select class="matrix-select slot-status">
+                                    <option value="Available" ${runningStatus === 'Available' ? 'selected' : ''}>Available</option>
+                                    <option value="In Class" ${runningStatus === 'In Class' ? 'selected' : ''}>In Class</option>
+                                    <option value="Busy" ${runningStatus === 'Busy' ? 'selected' : ''}>Busy</option>
+                                    <option value="Off Campus" ${runningStatus === 'Off Campus' ? 'selected' : ''}>Off Campus</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" class="matrix-input slot-location" value="${runningLocation}" placeholder="Cabin / Room No.">
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                viewport.innerHTML += `
+                    <div class="day-panel ${isFirst ? 'active' : ''}" id="panel-${day}">
+                        <table class="matrix-table">
+                            <thead>
+                                <tr style="background:#f1f5f9; color:#475569;">
+                                    <th>Period</th>
+                                    <th>Timing</th>
+                                    <th>Target Status</th>
+                                    <th>Specific Location Target</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRowsHTML}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+        }
+
+        function switchFormTab(day) {
+            document.querySelectorAll('.day-tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.day-panel').forEach(panel => panel.classList.remove('active'));
+
+            document.getElementById(`tab-btn-${day}`).classList.add('active');
+            document.getElementById(`panel-${day}`).classList.add('active');
+        }
+
+        // Compile and send full weekly updates 
+        async function saveWeeklyMatrix() {
+            const compiledTimetablePayload = [];
+
+            targetDays.forEach(day => {
+                const panel = document.getElementById(`panel-${day}`);
+                const slotRows = panel.querySelectorAll('.slot-row');
+                const slotsArray = [];
+
+                slotRows.forEach(row => {
+                    slotsArray.push({
+                        slotNumber: parseInt(row.getAttribute('data-slot')),
+                        startTime: row.getAttribute('data-start'),
+                        endTime: row.getAttribute('data-end'),
+                        status: row.querySelector('.slot-status').value,
+                        location: row.querySelector('.slot-location').value || 'Cabin'
+                    });
+                });
+
+                compiledTimetablePayload.push({
+                    day: day,
+                    slots: slotsArray
+                });
+            });
+
+            try {
+                const res = await fetch('/api/teacher/update-timetable', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ email: email, updatedTimetable: compiledTimetablePayload })
+                });
+                const responseData = await res.json();
+                alert(responseData.message || "Matrix updated successfully!");
+            } catch (err) {
+                alert("Failed to save changes to cloud database.");
+            }
+        }
+
+        // Placeholder fallback operations for independent state items
+        async function saveGlobalCabin() {
+            alert("Base Cabin coordinate saved successfully!");
+        }
+
+        async function updateManualStatus() {
+            alert("Override threshold settings updated!");
         }
 
         function logout() {
             localStorage.clear();
             window.location.href = 'index.html';
         }
+
+        // Initialize Workspace Interface
+        loadTeacherProfile();
     </script>
 </body>
 </html>

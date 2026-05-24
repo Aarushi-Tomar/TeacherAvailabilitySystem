@@ -15,8 +15,9 @@ router.post('/signup', async (req, res) => {
             return res.status(400).json({ message: "All fields are required" });
         }
 
-        // 🛑 DOMAIN SECURITY PATCH: Block email-role spoofing cross-contamination
         const emailLower = email.toLowerCase().trim();
+
+        // 🛑 DOMAIN SECURITY PATCH: Block email-role spoofing cross-contamination
         if (role === 'teacher' && !emailLower.endsWith('@teacher.edu')) {
             return res.status(400).json({ 
                 message: "Security violation: Teacher portal registration requires a valid @teacher.edu email address." 
@@ -34,12 +35,13 @@ router.post('/signup', async (req, res) => {
             return res.status(400).json({ message: "User already registered" });
         }
 
-        // ✨ CLEANED UP: Handing off raw password directly to User.js model.
-        // The pre-save model hook handles hashing automatically to avoid accidental double-encryption bugs.
+        // 🔒 Explicitly hash the password securely before saving to DB
+        const hashedPassword = await bcrypt.hash(password, 10);
+
         const newUser = new User({
             name,
             email: emailLower,
-            password, // Passed cleanly to trigger Mongoose pre-save security encryption hook safely
+            password: hashedPassword,
             role
         });
 
@@ -56,7 +58,6 @@ router.post('/signup', async (req, res) => {
 // ========================
 router.post('/login', async (req, res) => {
     try {
-        // 🎯 FIXED: Destructure and pull the selected 'role' from req.body payload sent by script.js
         const { email, password, role } = req.body;
 
         if (!email || !password || !role) {
@@ -89,7 +90,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ message: "Invalid email or password" });
         }
 
-        // Generate genuine secure JWT authorization token
+        // Generate secure JWT authorization token
         const token = jwt.sign(
             { id: user._id, email: user.email, role: user.role },
             process.env.JWT_SECRET || 'aarushi_secret_key_2026',
@@ -104,6 +105,39 @@ router.post('/login', async (req, res) => {
     } catch (err) {
         console.error("Login Error:", err);
         res.status(500).json({ message: "Server error during login" });
+    }
+});
+
+// ===================================
+// 3. 🔑 SIMPLIFIED FORGOT PASSWORD ROUTE
+// ===================================
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email, newPassword } = req.body;
+
+        if (!email || !newPassword) {
+            return res.status(400).json({ message: "Email and new password are required." });
+        }
+
+        const emailLower = email.toLowerCase().trim();
+
+        // Check if user exists in our records
+        const user = await User.findOne({ email: emailLower });
+        if (!user) {
+            return res.status(404).json({ message: "No account found with this email address." });
+        }
+
+        // Hash the new password securely
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        
+        // Update password directly
+        user.password = hashedPassword;
+        await user.save();
+
+        res.status(200).json({ message: "Password updated successfully! You can now log in with your new password." });
+    } catch (err) {
+        console.error("Forgot Password Error:", err);
+        res.status(500).json({ message: "Server error during password override update." });
     }
 });
 
