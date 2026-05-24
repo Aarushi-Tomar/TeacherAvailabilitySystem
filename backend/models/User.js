@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
 // Single Period Slot Schema
 const TimetableSlotSchema = new mongoose.Schema({
@@ -22,7 +21,8 @@ const DailyScheduleSchema = new mongoose.Schema({
     day: { 
         type: String, 
         required: true, 
-        enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] 
+        // 🌟 FIXED: Matched directly with your frontend UI tab keys
+        enum: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] 
     },
     slots: [TimetableSlotSchema]
 });
@@ -36,31 +36,30 @@ const UserSchema = new mongoose.Schema({
     department: { type: String, default: 'CSE' },
     cabin: { type: String, default: 'Not Assigned' }, 
     
-    // Persists manual status bypass selections from dropdown selectors
     manualStatus: { 
         type: String, 
         enum: ['None', 'Available', 'Busy', 'In Class', 'Off Campus'], 
         default: 'None' 
     },
 
-    // Nested Weekly Matrix array (Only populated for teacher accounts)
     timetable: [DailyScheduleSchema]
 }, { timestamps: true });
 
-// 🛠️ FIXED ASYNC PRE-SAVE HOOK: Removed broken next() callbacks
+// 🛠️ FIXED ASYNC PRE-SAVE HOOK: No next() callbacks, uses three-letter keys
 UserSchema.pre('save', async function() {
-    // 🔒 SECTION A: SAFE PASSWORD HASHING GUARD
+    // SECTION A: SAFE PASSWORD HASHING GUARD
     if (this.isModified('password')) {
-        // Check if it's already a bcrypt hash (starts with $2a$ or $2b$) to prevent double hashing
+        const bcrypt = require('bcryptjs');
         if (!this.password.startsWith('$2a$') && !this.password.startsWith('$2b$')) {
             const salt = await bcrypt.genSalt(10);
             this.password = await bcrypt.hash(this.password, salt);
         }
     }
 
-    // 🔄 SECTION B: AUTOMATIC TEACHER TIMETABLE INITIALIZATION
+    // SECTION B: AUTOMATIC TEACHER TIMETABLE INITIALIZATION
     if (this.role === 'teacher' && (!this.timetable || this.timetable.length === 0)) {
-        const targetDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        // 🌟 FIXED: Seeded using frontend-matching short days
+        const targetDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         
         const getDailySlotsFactory = () => [
             { slotNumber: 1, startTime: "08:30", endTime: "09:20", status: "Not Available", location: "Off Campus" },
@@ -80,7 +79,6 @@ UserSchema.pre('save', async function() {
             slots: getDailySlotsFactory()
         }));
     }
-    // No next() call needed here for async pre-save hooks! returning is enough.
 });
 
 module.exports = mongoose.model('User', UserSchema);
