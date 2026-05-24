@@ -1,39 +1,56 @@
 const express = require('express');
+
 const router = express.Router();
+
 const mongoose = require('mongoose');
+
 const User = mongoose.model('User');
 
-// SAVE / UPDATE full timetable matrix
+// Note: You should ideally add your JWT verification middleware here later
+
+
+
+// Save/Update full timetable
+
 router.post('/update-timetable', async (req, res) => {
+
     try {
-        const { email, updatedTimetable } = req.body; 
 
-        // Find the specific teacher profile
-        const teacher = await User.findOne({ email: email.toLowerCase().trim(), role: 'teacher' });
+        const { email, updatedTimetable } = req.body; // Using email to identify for now
+
+
+
+        const teacher = await User.findOne({ email, role: 'teacher' });
+
         if (!teacher) {
-            return res.status(404).json({ message: "Teacher account profile not found." });
+
+            return res.status(404).json({ message: "Teacher account not found" });
+
         }
 
-        // Server-side structural status alignment validation check
-        const allowedStatuses = ['Available', 'In Class', 'Busy', 'Off Campus', 'Not Available'];
-        
-        for (let slot of updatedTimetable) {
-            if (slot.status && !allowedStatuses.includes(slot.status)) {
-                return res.status(400).json({ 
-                    message: `Invalid status configuration detected: "${slot.status}".` 
-                });
-            }
-        }
 
-        // Replace old timetable data grid with the newly configured slots from the portal frontend layout
+
+        // Replace old timetable data with updates from the portal layout
+
         teacher.timetable = updatedTimetable;
+
         await teacher.save();
 
-        res.status(200).json({ message: "Timetable schedule grid updated successfully!" });
+
+
+        res.status(200).json({ message: "Timetable schedule updated successfully!" });
+
     } catch (err) {
-        console.error("Teacher portal matrix save exception:", err);
-        res.status(500).json({ message: "Failed to save updated classroom schedule records due to a server fault." });
+
+        console.error(err);
+
+        res.status(500).json({ message: "Failed to update schedule" });
+
     }
+
 });
 
-module.exports = router;
+
+
+module.exports = router; 
+
