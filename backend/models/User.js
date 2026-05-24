@@ -47,18 +47,14 @@ const UserSchema = new mongoose.Schema({
     timetable: [DailyScheduleSchema]
 }, { timestamps: true });
 
-// 🛠️ UNIFIED PRE-SAVE HOOK: Handles Safe Password Hashing & Timetable Seeding
-UserSchema.pre('save', async function(next) {
+// 🛠️ FIXED ASYNC PRE-SAVE HOOK: Removed broken next() callbacks
+UserSchema.pre('save', async function() {
     // 🔒 SECTION A: SAFE PASSWORD HASHING GUARD
     if (this.isModified('password')) {
-        try {
-            // Check if it's already a bcrypt hash (starts with $2a$ or $2b$) to prevent double hashing
-            if (!this.password.startsWith('$2a$') && !this.password.startsWith('$2b$')) {
-                const salt = await bcrypt.genSalt(10);
-                this.password = await bcrypt.hash(this.password, salt);
-            }
-        } catch (err) {
-            return next(err);
+        // Check if it's already a bcrypt hash (starts with $2a$ or $2b$) to prevent double hashing
+        if (!this.password.startsWith('$2a$') && !this.password.startsWith('$2b$')) {
+            const salt = await bcrypt.genSalt(10);
+            this.password = await bcrypt.hash(this.password, salt);
         }
     }
 
@@ -84,8 +80,7 @@ UserSchema.pre('save', async function(next) {
             slots: getDailySlotsFactory()
         }));
     }
-
-    next();
+    // No next() call needed here for async pre-save hooks! returning is enough.
 });
 
 module.exports = mongoose.model('User', UserSchema);
