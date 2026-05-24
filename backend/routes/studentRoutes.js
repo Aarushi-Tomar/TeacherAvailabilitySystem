@@ -14,31 +14,26 @@ router.get('/teachers', async (req, res) => {
         const token = authHeader.split(' ')[1];
         jwt.verify(token, process.env.JWT_SECRET || 'aarushi_secret_key_2026');
 
-        // Fetch all users whose role is 'teacher'
         const teachers = await User.find({ role: 'teacher' }).select('-password');
 
-        // Map system getDay() indexes to our precise database Day strings
-        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        // 🌟 FIXED: Changed map array to 3-letter shorthands to match User.js schema fields
+        const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const now = new Date();
         
-        // Convert local time explicitly to Indian Standard Time (IST) 24-hour format
         const options = { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit' };
         const currentTimeStr = now.toLocaleTimeString('en-US', options); 
-        const currentDayName = daysOfWeek[now.getDay()]; 
+        const currentDayName = daysOfWeek[now.getDay()]; // e.g., "Mon"
 
-        // Core college operational hours bounds
         const isOutsideCollegeHours = (currentTimeStr < "08:30" || currentTimeStr > "17:10");
-        const isSunday = (currentDayName === 'Sunday');
+        const isSunday = (currentDayName === 'Sun');
 
         const liveFacultyList = teachers.map(teacher => {
             let currentStatus = "Off Campus";
             let currentLocation = "Off Campus";
 
-            // 🔍 Locate the sub-document day matching today's calendar item in the new matrix structure
             const dayDocument = teacher.timetable ? teacher.timetable.find(t => t.day === currentDayName) : null;
             const todaysSlots = dayDocument ? dayDocument.slots : [];
 
-            // Find if a timed block is actively running right now
             const activeSlot = todaysSlots.find(slot => {
                 return currentTimeStr >= slot.startTime && currentTimeStr < slot.endTime;
             });
@@ -47,18 +42,13 @@ router.get('/teachers', async (req, res) => {
                 currentStatus = "Not Available";
                 currentLocation = "Off Campus";
             } else if (activeSlot) {
-                // We are inside an active class period! Pull dynamic data
                 currentStatus = activeSlot.status || "Available";
                 currentLocation = activeSlot.location || "Cabin";
             } else {
-                // 🕒 PASSING BREAK DETECTED: 
-                // We are inside college hours, but no period matches current minutes (e.g. 5-min passing gap)
                 currentStatus = "In Break";
                 currentLocation = "Passing Corridor";
             }
 
-            // Map and return the complete schedule matrix array structure for the frontend UI tabs
-            // If it's night or Sunday, pre-format the feedback array so students see the forced static rules instantly
             const processedTimetable = teacher.timetable.map(dayGroup => {
                 return {
                     day: dayGroup.day,
@@ -80,8 +70,8 @@ router.get('/teachers', async (req, res) => {
                 name: teacher.name,
                 department: teacher.department || 'CSE',
                 status: currentStatus,
-                cabin: teacher.cabin || currentLocation, // Uses custom designated fallback cabin if assigned
-                liveLocation: currentLocation,           // The dynamic running coordinate
+                cabin: teacher.cabin || currentLocation, 
+                liveLocation: currentLocation,           
                 fullTimetable: processedTimetable 
             };
         });

@@ -107,182 +107,182 @@
 
     <script>
         let allTeachers = []; 
-        const targetDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+// 🌟 FIXED: Match short name keys expected from User.js schema
+const targetDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-        const token = localStorage.getItem('token');
-        if (!token) {
-            alert("Session expired or unauthorized. Please log in again.");
-            window.location.href = 'index.html';
-        }
+const token = localStorage.getItem('token');
+if (!token) {
+    alert("Session expired or unauthorized. Please log in again.");
+    window.location.href = 'index.html';
+}
 
-        // Get Current Day to highlight by default
-        const sysDayIndex = new Date().getDay();
-        const currentCampusDay = sysDayIndex === 0 ? 'Sunday' : targetDays[sysDayIndex - 1];
+// 🌟 FIXED: Map Date indexes safely to match short names
+const sysDayIndex = new Date().getDay(); // 0 = Sun, 1 = Mon...
+const currentCampusDay = targetDays[sysDayIndex === 0 ? 6 : sysDayIndex - 1];
 
-        async function fetchTeachers() {
-            try {
-                const res = await fetch('/api/student/teachers', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                allTeachers = await res.json();
-                filterAndRender();
-            } catch (err) {
-                console.error("Failed to load teachers or connect to server mapping layer.");
+async function fetchTeachers() {
+    try {
+        const res = await fetch('/api/student/teachers', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        allTeachers = await res.json();
+        filterAndRender();
+    } catch (err) {
+        console.error("Failed to load teachers or connect to server mapping layer.");
+    }
+}
+
+function filterAndRender() {
+    const query = document.getElementById('teacherSearch').value.toLowerCase().trim();
+    const filtered = allTeachers.filter(t => 
+        t.name.toLowerCase().includes(query) || 
+        (t.department && t.department.toLowerCase().includes(query))
+    );
+    renderTeachers(filtered);
+}
+
+document.getElementById('teacherSearch').addEventListener('input', filterAndRender);
+
+function renderTeachers(teachers) {
+    const container = document.getElementById('teacher-list');
+    if (teachers.length === 0) {
+        container.innerHTML = `<p style="text-align:center; color:var(--text-muted); margin-top: 20px;">No faculty matches found.</p>`;
+        return;
+    }
+
+    container.innerHTML = teachers.map((t, index) => {
+        const computedStatus = t.status || 'Off Campus';
+        const globalCabin = t.cabin || 'Off Campus';
+
+        let dayTabButtonsHTML = '';
+        let dailyPanelsHTML = '';
+
+        targetDays.forEach(day => {
+            const isTodayActive = (day === currentCampusDay);
+            dayTabButtonsHTML += `
+                <button class="day-tab-btn ${isTodayActive ? 'active' : ''}" onclick="switchDayTab(event, '${day}', ${index})">
+                    ${day}
+                </button>
+            `;
+
+            // 🌟 FIXED: Accessing t.fullTimetable which is what studentRoutes.js outputs
+            const targetedDayDoc = t.fullTimetable ? t.fullTimetable.find(d => d.day === day) : null;
+            const slotsToRender = targetedDayDoc ? targetedDayDoc.slots : [];
+
+            let slotRowsHTML = '';
+            if (slotsToRender.length > 0) {
+                slotRowsHTML = slotsToRender.map(s => `
+                    <tr>
+                        <td style="font-weight:600; color:#4f46e5;">Period ${s.slotNumber}</td>
+                        <td style="color:#64748b;">${s.startTime} - ${s.endTime}</td>
+                        <td><span style="color:${getStatusColor(s.status)}; font-weight:700;">● ${s.status}</span></td>
+                        <td><strong>${s.location || 'Off Campus'}</strong></td>
+                    </tr>
+                `).join('');
+            } else {
+                slotRowsHTML = `<tr><td colspan="4" style="text-align:center; color:#64748b;">No periods assigned.</td></tr>`;
             }
-        }
 
-        function filterAndRender() {
-            const query = document.getElementById('teacherSearch').value.toLowerCase().trim();
-            const filtered = allTeachers.filter(t => 
-                t.name.toLowerCase().includes(query) || 
-                (t.department && t.department.toLowerCase().includes(query))
-            );
-            renderTeachers(filtered);
-        }
-
-        document.getElementById('teacherSearch').addEventListener('input', filterAndRender);
-
-        function renderTeachers(teachers) {
-            const container = document.getElementById('teacher-list');
-            if (teachers.length === 0) {
-                container.innerHTML = `<p style="text-align:center; color:var(--text-muted); margin-top: 20px;">No faculty matches found.</p>`;
-                return;
-            }
-
-            container.innerHTML = teachers.map((t, index) => {
-                const computedStatus = t.status || 'Off Campus';
-                const globalCabin = t.cabin || 'Off Campus';
-
-                let dayTabButtonsHTML = '';
-                let dailyPanelsHTML = '';
-
-                targetDays.forEach(day => {
-                    const isTodayActive = (day === currentCampusDay);
-                    dayTabButtonsHTML += `
-                        <button class="day-tab-btn ${isTodayActive ? 'active' : ''}" onclick="switchDayTab(event, '${day}', ${index})">
-                            ${day.substring(0,3)}
-                        </button>
-                    `;
-
-                    // 🛠️ FIX 1: Changed from t.fullTimetable to t.timetable to mirror the Mongoose schema keys
-                    const targetedDayDoc = t.timetable ? t.timetable.find(d => d.day === day) : null;
-                    const slotsToRender = targetedDayDoc ? targetedDayDoc.slots : [];
-
-                    let slotRowsHTML = '';
-                    if (slotsToRender.length > 0) {
-                        slotRowsHTML = slotsToRender.map(s => `
-                            <tr>
-                                <td style="font-weight:600; color:#4f46e5;">Period ${s.slotNumber}</td>
-                                <td style="color:#64748b;">${s.startTime} - ${s.endTime}</td>
-                                <td><span style="color:${getStatusColor(s.status)}; font-weight:700;">● ${s.status}</span></td>
-                                <td><strong>${s.location || 'Off Campus'}</strong></td>
+            dailyPanelsHTML += `
+                <div class="day-panel panel-${day} ${isTodayActive ? 'active' : ''}">
+                    <table class="mini-grid-table">
+                        <thead>
+                            <tr style="background: #f1f5f9;">
+                                <th>Period</th>
+                                <th>Timing</th>
+                                <th>Status</th>
+                                <th>Location</th>
                             </tr>
-                        `).join('');
-                    } else {
-                        slotRowsHTML = `<tr><td colspan="4" style="text-align:center; color:#64748b;">No periods assigned.</td></tr>`;
-                    }
-
-                    dailyPanelsHTML += `
-                        <div class="day-panel panel-${day} ${isTodayActive ? 'active' : ''}">
-                            <table class="mini-grid-table">
-                                <thead>
-                                    <tr style="background: #f1f5f9;">
-                                        <th>Period</th>
-                                        <th>Timing</th>
-                                        <th>Status</th>
-                                        <th>Location</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${slotRowsHTML}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
-                });
-
-                return `
-                <div class="auth-card teacher-card" style="max-width: 100%; margin-bottom: 20px; padding: 25px; border-left: 6px solid ${getStatusColor(computedStatus)}; display:block;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <h3 style="color: var(--text-main); margin-bottom: 6px; font-size: 1.2rem; font-weight: 700;">${t.name}</h3>
-                            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
-                                <i class="fas fa-map-marker-alt" style="color: #6366f1;"></i> 
-                                <span>Designated Cabin: <strong>${globalCabin}</strong></span>
-                            </p>
-                            <p style="font-size: 0.8rem; color: #a855f7; font-weight: 600; text-transform: uppercase; margin-bottom: 10px;">
-                                Dept: ${t.department || 'CSE'}
-                            </p>
-                            <button class="view-schedule-btn" onclick="toggleSchedule(${index})">
-                                <i class="fas fa-calendar-alt"></i> View Weekly Grid
-                            </button>
-                        </div>
-                        <div style="text-align: right;">
-                            <span style="background: ${getBgColor(computedStatus)}; color: ${getStatusColor(computedStatus)}; padding: 8px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; display: inline-block;">
-                                ● ${computedStatus.toUpperCase()}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div id="dropdown-${index}" class="timetable-dropdown">
-                        <div class="day-tabs-container">
-                            ${dayTabButtonsHTML}
-                        </div>
-                        ${dailyPanelsHTML}
-                    </div>
+                        </thead>
+                        <tbody>
+                            ${slotRowsHTML}
+                        </tbody>
+                    </table>
                 </div>
-                `;
-            }).join('');
-        }
+            `;
+        });
 
-        function toggleSchedule(index) {
-            const el = document.getElementById(`dropdown-${index}`);
-            el.classList.toggle('active');
-        }
+        return `
+        <div class="auth-card teacher-card" style="max-width: 100%; margin-bottom: 20px; padding: 25px; border-left: 6px solid ${getStatusColor(computedStatus)}; display:block;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="color: var(--text-main); margin-bottom: 6px; font-size: 1.2rem; font-weight: 700;">${t.name}</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-map-marker-alt" style="color: #6366f1;"></i> 
+                        <span>Designated Cabin: <strong>${globalCabin}</strong></span>
+                    </p>
+                    <p style="font-size: 0.8rem; color: #a855f7; font-weight: 600; text-transform: uppercase; margin-bottom: 10px;">
+                        Dept: ${t.department || 'CSE'}
+                    </p>
+                    <button class="view-schedule-btn" onclick="toggleSchedule(${index})">
+                        <i class="fas fa-calendar-alt"></i> View Weekly Grid
+                    </button>
+                </div>
+                <div style="text-align: right;">
+                    <span style="background: ${getBgColor(computedStatus)}; color: ${getStatusColor(computedStatus)}; padding: 8px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; display: inline-block;">
+                        ● ${computedStatus.toUpperCase()}
+                    </span>
+                </div>
+            </div>
 
-        function switchDayTab(event, targetDay, teacherCardIndex) {
-            event.stopPropagation(); 
-            const dropdown = document.getElementById(`dropdown-${teacherCardIndex}`);
-            
-            dropdown.querySelectorAll('.day-tab-btn').forEach(btn => btn.classList.remove('active'));
-            dropdown.querySelectorAll('.day-panel').forEach(p => p.classList.remove('active'));
+            <div id="dropdown-${index}" class="timetable-dropdown">
+                <div class="day-tabs-container">
+                    ${dayTabButtonsHTML}
+                </div>
+                ${dailyPanelsHTML}
+            </div>
+        </div>
+        `;
+    }).join('');
+}
 
-            event.currentTarget.classList.add('active');
-            dropdown.querySelector(`.panel-${targetDay}`).classList.add('active');
-        }
+function toggleSchedule(index) {
+    const el = document.getElementById(`dropdown-${index}`);
+    el.classList.toggle('active');
+}
 
-        // 🛠️ FIX 2: Remapped 'Not Available' to a clean visual slate slate-gray style color mapping
-        function getStatusColor(status) {
-            const colors = { 
-                'Available': '#10b981', 
-                'In Class': '#ef4444', 
-                'Busy': '#f59e0b', 
-                'In Break': '#8b5cf6', 
-                'Off Campus': '#64748b',
-                'Not Available': '#64748b' 
-            };
-            return colors[status] || '#64748b';
-        }
+function switchDayTab(event, targetDay, teacherCardIndex) {
+    event.stopPropagation(); 
+    const dropdown = document.getElementById(`dropdown-${teacherCardIndex}`);
+    
+    dropdown.querySelectorAll('.day-tab-btn').forEach(btn => btn.classList.remove('active'));
+    dropdown.querySelectorAll('.day-panel').forEach(p => p.classList.remove('active'));
 
-        function getBgColor(status) {
-            const bgs = { 
-                'Available': '#d1fae5', 
-                'In Class': '#fee2e2', 
-                'Busy': '#fef3c7', 
-                'In Break': '#ede9fe', 
-                'Off Campus': '#f1f5f9',
-                'Not Available': '#f1f5f9'
-            };
-            return bgs[status] || '#f1f5f9';
-        }
+    event.currentTarget.classList.add('active');
+    dropdown.querySelector(`.panel-${targetDay}`).classList.add('active');
+}
 
-        function logout() {
-            localStorage.clear();
-            window.location.href = 'index.html';
-        }
+function getStatusColor(status) {
+    const colors = { 
+        'Available': '#10b981', 
+        'In Class': '#ef4444', 
+        'Busy': '#f59e0b', 
+        'In Break': '#8b5cf6', 
+        'Off Campus': '#64748b',
+        'Not Available': '#64748b' 
+    };
+    return colors[status] || '#64748b';
+}
 
-        fetchTeachers();
-        setInterval(fetchTeachers, 30000); 
+function getBgColor(status) {
+    const bgs = { 
+        'Available': '#d1fae5', 
+        'In Class': '#fee2e2', 
+        'Busy': '#fef3c7', 
+        'In Break': '#ede9fe', 
+        'Off Campus': '#f1f5f9',
+        'Not Available': '#f1f5f9'
+    };
+    return bgs[status] || '#f1f5f9';
+}
+
+function logout() {
+    localStorage.clear();
+    window.location.href = 'index.html';
+}
+
+fetchTeachers();
+setInterval(fetchTeachers, 30000);
     </script>
 </body>
 </html>

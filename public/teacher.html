@@ -150,219 +150,202 @@
 
     <script>
         const token = localStorage.getItem('token');
-        const email = localStorage.getItem('email'); 
-        const targetDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        let teacherProfileMatrix = [];
+const email = localStorage.getItem('email'); 
+// 🌟 FIXED: Changed to three-letter shorthand keys to match User.js schema
+const targetDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+let teacherProfileMatrix = [];
 
-        if (!token || !email) {
-            alert("Session expired or unauthorized. Returning to login.");
-            window.location.href = 'index.html';
+if (!token || !email) {
+    alert("Session expired or unauthorized. Returning to login.");
+    window.location.href = 'index.html';
+}
+
+// Standard 10-Period Time Block Structure Factory Mapping
+const standardTimeBlocks = [
+    { slotNumber: 1, startTime: "08:30", endTime: "09:20" },
+    { slotNumber: 2, startTime: "09:20", endTime: "10:10" },
+    { slotNumber: 3, startTime: "10:15", endTime: "11:05" },
+    { slotNumber: 4, startTime: "11:05", endTime: "11:55" },
+    { slotNumber: 5, startTime: "12:00", endTime: "12:50" },
+    { slotNumber: 6, startTime: "12:50", endTime: "13:40" },
+    { slotNumber: 7, startTime: "13:45", endTime: "14:35" },
+    { slotNumber: 8, startTime: "14:35", endTime: "15:25" },
+    { slotNumber: 9, startTime: "15:30", endTime: "16:20" },
+    { slotNumber: 10, startTime: "16:20", endTime: "17:10" }
+];
+
+async function loadTeacherProfile() {
+    try {
+        const res = await fetch(`/api/teacher/my-timetable?email=${encodeURIComponent(email)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            // Keep your global elements running
+            teacherProfileMatrix = data.timetable || [];
+            buildTabsAndGrids();
         }
+    } catch (err) {
+        console.error("Error hydrating profile configuration interfaces:", err);
+    }
+}
 
-        // Standard 10-Period Time Block Structure Factory Mapping
-        const standardTimeBlocks = [
-            { slotNumber: 1, startTime: "08:30", endTime: "09:20" },
-            { slotNumber: 2, startTime: "09:20", endTime: "10:10" },
-            { slotNumber: 3, startTime: "10:15", endTime: "11:05" },
-            { slotNumber: 4, startTime: "11:05", endTime: "11:55" },
-            { slotNumber: 5, startTime: "12:00", endTime: "12:50" },
-            { slotNumber: 6, startTime: "12:50", endTime: "13:40" },
-            { slotNumber: 7, startTime: "13:45", endTime: "14:35" },
-            { slotNumber: 8, startTime: "14:35", endTime: "15:25" },
-            { slotNumber: 9, startTime: "15:30", endTime: "16:20" },
-            { slotNumber: 10, startTime: "16:20", endTime: "17:10" }
-        ];
+function buildTabsAndGrids() {
+    const tabContainer = document.getElementById('daysTabContainer');
+    const viewport = document.getElementById('matrix-form-viewport');
+    
+    tabContainer.innerHTML = '';
+    viewport.innerHTML = '';
 
-        // Fetch profile matrix values on launch
-        async function loadTeacherProfile() {
-            try {
-                const res = await fetch(`/api/teacher/my-timetable?email=${encodeURIComponent(email)}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                
-                if (res.ok) {
-                    document.getElementById('globalCabin').value = data.cabin || '';
-                    teacherProfileMatrix = data.timetable || [];
-                    buildTabsAndGrids();
-                }
-            } catch (err) {
-                console.error("Error hydrating profile configuration interfaces:", err);
-            }
-        }
+    targetDays.forEach((day, index) => {
+        const isFirst = index === 0;
+        
+        tabContainer.innerHTML += `
+            <button type="button" class="day-tab-btn ${isFirst ? 'active' : ''}" id="tab-btn-${day}" onclick="switchFormTab('${day}')">
+                ${day}
+            </button>
+        `;
 
-        function buildTabsAndGrids() {
-            const tabContainer = document.getElementById('daysTabContainer');
-            const viewport = document.getElementById('matrix-form-viewport');
-            
-            tabContainer.innerHTML = '';
-            viewport.innerHTML = '';
+        const dayDoc = teacherProfileMatrix.find(d => d.day === day);
+        const savedSlots = dayDoc ? dayDoc.slots : [];
 
-            targetDays.forEach((day, index) => {
-                const isFirst = index === 0;
-                
-                // Build Tab Buttons
-                tabContainer.innerHTML += `
-                    <button type="button" class="day-tab-btn ${isFirst ? 'active' : ''}" id="tab-btn-${day}" onclick="switchFormTab('${day}')">
-                        ${day}
-                    </button>
-                `;
+        let tableRowsHTML = '';
+        standardTimeBlocks.forEach(block => {
+            const savedSlot = savedSlots.find(s => s.slotNumber === block.slotNumber);
+            const runningStatus = savedSlot ? savedSlot.status : 'Not Available';
+            const runningLocation = savedSlot ? savedSlot.location : 'Off Campus';
 
-                // Find saved sub-document rows or seed unconfigured data defaults cleanly
-                const dayDoc = teacherProfileMatrix.find(d => d.day === day);
-                const savedSlots = dayDoc ? dayDoc.slots : [];
+            tableRowsHTML += `
+                <tr class="slot-row" data-slot="${block.slotNumber}" data-start="${block.startTime}" data-end="${block.endTime}">
+                    <td style="font-weight:600; color:#4f46e5;">Period ${block.slotNumber}</td>
+                    <td style="color:#64748b; font-size:0.8rem;">${block.startTime} - ${block.endTime}</td>
+                    <td>
+                        <select class="matrix-select slot-status">
+                            <option value="Not Available" ${runningStatus === 'Not Available' ? 'selected' : ''}>Not Available</option>
+                            <option value="Available" ${runningStatus === 'Available' ? 'selected' : ''}>Available</option>
+                            <option value="In Class" ${runningStatus === 'In Class' ? 'selected' : ''}>In Class</option>
+                            <option value="Busy" ${runningStatus === 'Busy' ? 'selected' : ''}>Busy</option>
+                            <option value="Off Campus" ${runningStatus === 'Off Campus' ? 'selected' : ''}>Off Campus</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="text" class="matrix-input slot-location" value="${runningLocation}" placeholder="Cabin / Room No.">
+                    </td>
+                </tr>
+            `;
+        });
 
-                let tableRowsHTML = '';
-                standardTimeBlocks.forEach(block => {
-                    const savedSlot = savedSlots.find(s => s.slotNumber === block.slotNumber);
-                    
-                    // 🔒 DEFENSIVE DEFALTS: Set to 'Not Available' and 'Off Campus' if unconfigured by professor
-                    const runningStatus = savedSlot ? savedSlot.status : 'Not Available';
-                    const runningLocation = savedSlot ? savedSlot.location : 'Off Campus';
-
-                    tableRowsHTML += `
-                        <tr class="slot-row" data-slot="${block.slotNumber}" data-start="${block.startTime}" data-end="${block.endTime}">
-                            <td style="font-weight:600; color:#4f46e5;">Period ${block.slotNumber}</td>
-                            <td style="color:#64748b; font-size:0.8rem;">${block.startTime} - ${block.endTime}</td>
-                            <td>
-                                <select class="matrix-select slot-status">
-                                    <option value="Not Available" ${runningStatus === 'Not Available' ? 'selected' : ''}>Not Available</option>
-                                    <option value="Available" ${runningStatus === 'Available' ? 'selected' : ''}>Available</option>
-                                    <option value="In Class" ${runningStatus === 'In Class' ? 'selected' : ''}>In Class</option>
-                                    <option value="Busy" ${runningStatus === 'Busy' ? 'selected' : ''}>Busy</option>
-                                    <option value="Off Campus" ${runningStatus === 'Off Campus' ? 'selected' : ''}>Off Campus</option>
-                                </select>
-                            </td>
-                            <td>
-                                <input type="text" class="matrix-input slot-location" value="${runningLocation}" placeholder="Cabin / Room No.">
-                            </td>
+        viewport.innerHTML += `
+            <div class="day-panel ${isFirst ? 'active' : ''}" id="panel-${day}">
+                <table class="matrix-table">
+                    <thead>
+                        <tr style="background:#f1f5f9; color:#475569;">
+                            <th>Period</th>
+                            <th>Timing</th>
+                            <th>Target Status</th>
+                            <th>Specific Location Target</th>
                         </tr>
-                    `;
-                });
+                    </thead>
+                    <tbody>
+                        ${tableRowsHTML}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    });
+}
 
-                viewport.innerHTML += `
-                    <div class="day-panel ${isFirst ? 'active' : ''}" id="panel-${day}">
-                        <table class="matrix-table">
-                            <thead>
-                                <tr style="background:#f1f5f9; color:#475569;">
-                                    <th>Period</th>
-                                    <th>Timing</th>
-                                    <th>Target Status</th>
-                                    <th>Specific Location Target</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${tableRowsHTML}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            });
-        }
+function switchFormTab(day) {
+    document.querySelectorAll('.day-tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.day-panel').forEach(panel => panel.classList.remove('active'));
 
-        function switchFormTab(day) {
-            document.querySelectorAll('.day-tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.day-panel').forEach(panel => panel.classList.remove('active'));
+    document.getElementById(`tab-btn-${day}`).classList.add('active');
+    document.getElementById(`panel-${day}`).classList.add('active');
+}
 
-            document.getElementById(`tab-btn-${day}`).classList.add('active');
-            document.getElementById(`panel-${day}`).classList.add('active');
-        }
+// 🌟 FIXED: Loops and saves each day matching backend schema expectations
+async function saveWeeklyMatrix() {
+    try {
+        let successCount = 0;
 
-        // Compile and send full weekly updates 
-        async function saveWeeklyMatrix() {
-            const compiledTimetablePayload = [];
+        for (const day of targetDays) {
+            const panel = document.getElementById(`panel-${day}`);
+            if (!panel) continue;
 
-            targetDays.forEach(day => {
-                const panel = document.getElementById(`panel-${day}`);
-                if (!panel) return;
+            const slotRows = panel.querySelectorAll('.slot-row');
+            const slotsArray = [];
 
-                const slotRows = panel.querySelectorAll('.slot-row');
-                const slotsArray = [];
-
-                slotRows.forEach(row => {
-                    slotsArray.push({
-                        slotNumber: parseInt(row.getAttribute('data-slot')),
-                        startTime: row.getAttribute('data-start'),
-                        endTime: row.getAttribute('data-end'),
-                        status: row.querySelector('.slot-status').value,
-                        location: row.querySelector('.slot-location').value || 'Off Campus'
-                    });
-                });
-
-                compiledTimetablePayload.push({
-                    day: day,
-                    slots: slotsArray
+            slotRows.forEach(row => {
+                slotsArray.push({
+                    slotNumber: parseInt(row.getAttribute('data-slot')),
+                    startTime: row.getAttribute('data-start'),
+                    endTime: row.getAttribute('data-end'),
+                    status: row.querySelector('.slot-status').value,
+                    location: row.querySelector('.slot-location').value || 'Off Campus'
                 });
             });
 
-            try {
-                // Synchronized database endpoint route target matching backend structure
-                const res = await fetch('/api/teacher/update-timetable', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ email: email, updatedTimetable: compiledTimetablePayload })
-                });
-                
-                const responseData = await res.json();
-                
-                if (res.ok) {
-                    alert(responseData.message || "Matrix updated successfully!");
-                } else {
-                    alert("Error: " + (responseData.message || "Failed to update schedule structure."));
-                }
-            } catch (err) {
-                alert("Failed to save changes to cloud database.");
-            }
+            // Post requests to update days matching backend routing payload parameters
+            const res = await fetch('/api/teacher/update-timetable', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ email: email, day: day, slots: slotsArray })
+            });
+
+            if (res.ok) successCount++;
         }
 
-        // Quick Global Cabin handler
-        async function saveGlobalCabin() {
-            const cabinValue = document.getElementById('globalCabin').value;
-            try {
-                const res = await fetch('/api/teacher/update-cabin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ email: email, cabin: cabinValue })
-                });
-                const data = await res.json();
-                alert(data.message || "Base cabin location successfully updated!");
-            } catch (err) {
-                alert("Failed to update base cabin coordinate.");
-            }
+        if (successCount === targetDays.length) {
+            alert("Weekly schedule matrix successfully synchronized!");
+            loadTeacherProfile(); // Re-fetch to keep data fresh
+        } else {
+            alert("Some days failed to update completely.");
         }
+    } catch (err) {
+        alert("Failed to save changes to cloud database.");
+    }
+}
 
-        // Manual Override handler
-        async function updateManualStatus() {
-            const statusValue = document.getElementById('manualStatus').value;
-            try {
-                const res = await fetch('/api/teacher/update-status', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ email: email, manualStatus: statusValue })
-                });
-                const data = await res.json();
-                alert(data.message || "Global manual override rule successfully applied!");
-            } catch (err) {
-                alert("Failed to fire active temporary status override request.");
-            }
-        }
+async function saveGlobalCabin() {
+    const cabinValue = document.getElementById('globalCabin').value;
+    try {
+        const res = await fetch('/api/teacher/update-cabin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ email: email, cabin: cabinValue })
+        });
+        const data = await res.json();
+        alert(data.message || "Base cabin location successfully updated!");
+    } catch (err) {
+        alert("Failed to update base cabin coordinate.");
+    }
+}
 
-        function logout() {
-            localStorage.clear();
-            window.location.href = 'index.html';
-        }
+async function updateManualStatus() {
+    const statusValue = document.getElementById('manualStatus').value;
+    try {
+        const res = await fetch('/api/teacher/update-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ email: email, manualStatus: statusValue })
+        });
+        const data = await res.json();
+        alert(data.message || "Global manual override rule successfully applied!");
+    } catch (err) {
+        alert("Failed to fire active temporary status override request.");
+    }
+}
 
-        // Initialize Workspace Interface
-        loadTeacherProfile();
+function logout() {
+    localStorage.clear();
+    window.location.href = 'index.html';
+}
+
+loadTeacherProfile();
     </script>
 </body>
 </html>
