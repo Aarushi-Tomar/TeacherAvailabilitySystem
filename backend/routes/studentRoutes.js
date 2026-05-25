@@ -50,8 +50,8 @@ router.get('/teachers', async (req, res) => {
                 });
 
                 if (activeSlot) {
-                    currentStatus = slot.status || "Not Available";
-                    currentLocation = slot.location || "Off Campus";
+                    currentStatus = activeSlot.status || "Not Available";
+                    currentLocation = activeSlot.location || "Off Campus";
                 } else {
                     // Default fallback if time is within college hours but explicitly unconfigured or a break slot
                     currentStatus = "Not Available";
